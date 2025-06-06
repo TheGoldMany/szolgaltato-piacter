@@ -3,7 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const pool = require('./config/database');
-const authRoutes = require('./routes/auth'); // ÚJ SOR - fontos a helye!
+const authRoutes = require('./routes/auth');
+const profileRoutes = require('./routes/profiles');
 require('dotenv').config();
 
 const app = express();
@@ -18,6 +19,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // ÚJ - Auth routes RÖGTÖN a middleware után!
 app.use('/api/auth', authRoutes);
+app.use('/api/profiles', profileRoutes); 
 
 // Existing routes
 app.get('/', (req, res) => {
