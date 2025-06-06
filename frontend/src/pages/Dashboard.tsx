@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -47,14 +48,14 @@ const Dashboard: React.FC = () => {
               <div className="card">
                 <h3 className="text-xl font-semibold mb-4">🎨 Profil kezelés</h3>
                 <div className="space-y-4">
-                  <button className="btn btn-primary w-full">
+                  <Link to="/profile/edit" className="btn btn-primary w-full" style={{textDecoration: 'none', display: 'block', textAlign: 'center'}}>
                     Profil szerkesztése
-                  </button>
+                  </Link>
+                  <Link to="/profile/view" className="btn btn-outline w-full" style={{textDecoration: 'none', display: 'block', textAlign: 'center'}}>
+                    Profil előnézet
+                  </Link>
                   <button className="btn btn-outline w-full">
-                    Képek feltöltése
-                  </button>
-                  <button className="btn btn-outline w-full">
-                    Szolgáltatások kezelése
+                    Képek feltöltése (hamarosan)
                   </button>
                 </div>
               </div>
@@ -63,7 +64,15 @@ const Dashboard: React.FC = () => {
                 <h3 className="text-xl font-semibold mb-4">💬 Üzenetek</h3>
                 <p className="text-gray-600 mb-4">3 új üzenet várja válaszod</p>
                 <button className="btn btn-secondary w-full">
-                  Üzenetek megtekintése
+                  Üzenetek megtekintése (hamarosan)
+                </button>
+              </div>
+
+              <div className="card">
+                <h3 className="text-xl font-semibold mb-4">📋 Szolgáltatások</h3>
+                <p className="text-gray-600 mb-4">Kezeld szolgáltatásaidat és árajdat</p>
+                <button className="btn btn-outline w-full">
+                  Szolgáltatások kezelése (hamarosan)
                 </button>
               </div>
             </>
@@ -73,7 +82,7 @@ const Dashboard: React.FC = () => {
                 <h3 className="text-xl font-semibold mb-4">🔍 Keresés</h3>
                 <p className="text-gray-600 mb-4">Találd meg a tökéletes szolgáltatót</p>
                 <button className="btn btn-primary w-full">
-                  Szolgáltatók böngészése
+                  Szolgáltatók böngészése (hamarosan)
                 </button>
               </div>
 
@@ -81,7 +90,7 @@ const Dashboard: React.FC = () => {
                 <h3 className="text-xl font-semibold mb-4">⭐ Kedvencek</h3>
                 <p className="text-gray-600 mb-4">Még nincsenek kedvenc szolgáltatóid</p>
                 <button className="btn btn-outline w-full">
-                  Kedvencek kezelése
+                  Kedvencek kezelése (hamarosan)
                 </button>
               </div>
 
@@ -89,12 +98,33 @@ const Dashboard: React.FC = () => {
                 <h3 className="text-xl font-semibold mb-4">📋 Rendelések</h3>
                 <p className="text-gray-600 mb-4">Nincs aktív rendelésed</p>
                 <button className="btn btn-secondary w-full">
-                  Rendelés előzmények
+                  Rendelés előzmények (hamarosan)
                 </button>
               </div>
             </>
           )}
         </div>
+
+        {/* Quick Actions for Service Providers */}
+        {user?.userType === 'service_provider' && (
+          <div className="mt-8">
+            <h2 className="text-xl font-bold mb-4">🚀 Gyors műveletek</h2>
+            <div className="flex gap-4 flex-wrap">
+              <Link to="/profile/edit" className="btn btn-primary" style={{textDecoration: 'none'}}>
+                ✏️ Profil szerkesztése
+              </Link>
+              <button className="btn btn-outline">
+                📸 Képek feltöltése
+              </button>
+              <button className="btn btn-outline">
+                💼 Új szolgáltatás hozzáadása
+              </button>
+              <button className="btn btn-secondary">
+                📊 Statisztikák megtekintése
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

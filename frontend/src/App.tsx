@@ -6,6 +6,7 @@ import RegisterForm from './components/auth/RegisterForm';
 import Dashboard from './pages/Dashboard';
 import HomePage from './pages/HomePage';
 import Navbar from './components/common/Navbar';
+import ProfileEditor from './components/profile/ProfileEditor';
 import './App.css';
 
 // Protected Route component
@@ -42,39 +43,50 @@ const AppContent: React.FC = () => {
   return (
     <div className="App">
       <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<HomePage />} />
-        <Route 
-          path="/login" 
-          element={
-            <PublicRoute>
-              <LoginForm />
-            </PublicRoute>
-          } 
-        />
-        <Route 
-          path="/register" 
-          element={
-            <PublicRoute>
-              <RegisterForm />
-            </PublicRoute>
-          } 
-        />
+  {/* Public Routes */}
+  <Route path="/" element={<HomePage />} />
+  <Route 
+    path="/login" 
+    element={
+      <PublicRoute>
+        <LoginForm />
+      </PublicRoute>
+    } 
+  />
+  <Route 
+    path="/register" 
+    element={
+      <PublicRoute>
+        <RegisterForm />
+      </PublicRoute>
+    } 
+  />
 
-        {/* Protected Routes */}
-        <Route 
-          path="/dashboard" 
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <Dashboard />
-            </ProtectedRoute>
-          } 
-        />
+  {/* Protected Routes */}
+  <Route 
+    path="/dashboard" 
+    element={
+      <ProtectedRoute>
+        <Navbar />
+        <Dashboard />
+      </ProtectedRoute>
+    } 
+  />
+  
+  {/* ÚJ ROUTE */}
+  <Route 
+    path="/profile/edit" 
+    element={
+      <ProtectedRoute>
+        <Navbar />
+        <ProfileEditor />
+      </ProtectedRoute>
+    } 
+  />
 
-        {/* Catch all route */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+  {/* Catch all route */}
+  <Route path="*" element={<Navigate to="/" />} />
+</Routes>
     </div>
   );
 };
