@@ -91,13 +91,29 @@ app.use((req, res) => {
   });
 });
 
-// Server start
-app.listen(PORT, () => {
-  console.log(`🚀 Server fut a http://localhost:${PORT} címen`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔧 API docs: http://localhost:${PORT}/api`);
-  console.log(`🔐 Auth test: http://localhost:${PORT}/api/auth/test`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+// Server start csak ha nem teszt
+let server;
+if (process.env.NODE_ENV !== 'test') {
+  server = app.listen(PORT, () => {
+    console.log(`🚀 Server fut a http://localhost:${PORT} címen`);
+    console.log(`📊 Health check: http://localhost:${PORT}/health`);
+    console.log(`🔧 API docs: http://localhost:${PORT}/api`);
+    console.log(`🔐 Auth test: http://localhost:${PORT}/api/auth/test`);
+    console.log(`🌍 Environment: ${NODE_ENV}`);
+  });
+}
+
+// Export az app-ot teszteléshez
+module.exports = app;
+
+// Export az app-ot teszteléshez
+module.exports = app;
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    server.close(() => {
+      console.log('HTTP server closed');
+    });
+  });
 
 module.exports = app;
