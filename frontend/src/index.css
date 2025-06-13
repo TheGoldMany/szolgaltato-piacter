@@ -223,7 +223,124 @@ code {
   padding-left: 1rem;
   padding-right: 1rem;
 }
+/* Danger button styles */
+.btn-danger {
+  background-color: #dc2626;
+  color: white;
+  border: 1px solid #dc2626;
+}
 
+.btn-danger:hover {
+  background-color: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.btn-danger:disabled {
+  background-color: #6b7280;
+  border-color: #6b7280;
+  cursor: not-allowed;
+}
+
+/* Small button styles */
+.btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+/* Line clamp utilities for text truncation */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-4 {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Grid animation for better UX */
+.grid-cell-highlight {
+  background-color: rgba(59, 130, 246, 0.1);
+  border: 1px solid #3b82f6;
+}
+
+/* Module drag preview */
+.module-dragging {
+  opacity: 0.5;
+  transform: rotate(5deg);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Palette item hover effects */
+.palette-item {
+  transition: all 0.2s ease;
+}
+
+.palette-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 768px) {
+  .modular-editor-container {
+    padding: 1rem;
+  }
+  
+  .module-palette {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: white;
+    z-index: 50;
+    overflow-y: auto;
+  }
+  
+  .grid-canvas {
+    overflow-x: auto;
+  }
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Success/Error status colors */
+.status-saving {
+  color: #3b82f6;
+}
+
+.status-saved {
+  color: #10b981;
+}
+
+.status-error {
+  color: #ef4444;
+}
 /* Responsive */
 @media (max-width: 768px) {
   .container {

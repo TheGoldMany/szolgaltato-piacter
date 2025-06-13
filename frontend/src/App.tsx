@@ -7,8 +7,9 @@ import Dashboard from './pages/Dashboard';
 import HomePage from './pages/HomePage';
 import Navbar from './components/layout/Navbar';
 import ProfileEditor from './components/profile/ProfileEditor';
+import ModularProfileEditor from './components/profile/ModularProfileEditor'; // ÚJ IMPORT
 import { ProfileView } from './components/profile';
-import ServiceProviders from './pages/ServiceProviders'; // ÚJ IMPORT
+import ServiceProviders from './pages/ServiceProviders';
 import './App.css';
 
 // Protected Route component
@@ -41,73 +42,67 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return !isAuthenticated ? <>{children}</> : <Navigate to="/dashboard" />;
 };
 
-const AppContent: React.FC = () => {
-  return (
-    <div className="App">
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<HomePage />} />
-        <Route 
-          path="/login" 
-          element={
-            <PublicRoute>
-              <LoginForm />
-            </PublicRoute>
-          } 
-        />
-        <Route 
-          path="/register" 
-          element={
-            <PublicRoute>
-              <RegisterForm />
-            </PublicRoute>
-          } 
-        />
-
-        {/* ÚJ: Public Profile View - anyone can view profiles */}
-        <Route 
-          path="/profile/:id" 
-          element={
-            <>
-              <Navbar />
-              <ProfileView />
-            </>
-          } 
-        />
-
-        {/* Protected Routes */}
-        <Route 
-          path="/dashboard" 
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <Dashboard />
-            </ProtectedRoute>
-          } 
-        />
-        <Route path="/services" element={<ServiceProviders />} />
-        <Route 
-          path="/profile/edit" 
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <ProfileEditor />
-            </ProtectedRoute>
-          } 
-        />
-
-        {/* Catch all route */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </div>
-  );
-};
-
 const App: React.FC = () => {
   return (
     <AuthProvider>
       <Router>
-        <AppContent />
+        <div className="App">
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<HomePage />} />
+            <Route path="/services" element={<ServiceProviders />} />
+            <Route path="/profile/:id" element={<ProfileView />} />
+            
+            {/* Auth Routes */}
+            <Route 
+              path="/login" 
+              element={
+                <PublicRoute>
+                  <LoginForm />
+                </PublicRoute>
+              } 
+            />
+            <Route 
+              path="/register" 
+              element={
+                <PublicRoute>
+                  <RegisterForm />
+                </PublicRoute>
+              } 
+            />
+
+            {/* Protected Routes */}
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/profile/edit" 
+              element={
+                <ProtectedRoute>
+                  <ProfileEditor />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* ÚJ: Moduláris Profil Szerkesztő */}
+            <Route 
+              path="/profile/modular-editor" 
+              element={
+                <ProtectedRoute>
+                  <ModularProfileEditor />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Catch all route */}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </div>
       </Router>
     </AuthProvider>
   );
