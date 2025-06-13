@@ -99,8 +99,7 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`📊 Health check: http://localhost:${PORT}/health`);
     console.log(`🔧 API docs: http://localhost:${PORT}/api`);
     console.log(`🔐 Auth test: http://localhost:${PORT}/api/auth/test`);
-    console.log(`🌍 Environment: ${NODE_ENV}`);
-  });
+console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);  });
 }
 
 // Export az app-ot teszteléshez

@@ -1,12 +1,16 @@
 {
-  "dependencies": {
-    "bcryptjs": "^3.0.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
-    "express": "^5.1.0",
-    "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.0",
-    "pg": "^8.16.0"
+  "name": "szolgaltato-piacter",
+  "version": "1.0.0",
+  "description": "Szolgáltató piactér platform",
+  "private": true,
+  "scripts": {
+    "dev": "docker-compose up --build",
+    "dev:detached": "docker-compose up -d --build",
+    "dev:logs": "docker-compose logs -f",
+    "dev:down": "docker-compose down",
+    "dev:clean": "docker-compose down -v --remove-orphans",
+    "test": "npm run test:backend",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test"
   }
 }
