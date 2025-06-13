@@ -6,6 +6,7 @@ const pool = require('./config/database');
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profiles');
 const uploadRoutes = require('./routes/upload');
+const serviceProfilesRoutes = require('./routes/serviceProfiles');
 require('dotenv').config();
 
 
@@ -27,10 +28,12 @@ app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+
 // ÚJ - Auth routes RÖGTÖN a middleware után!
 app.use('/api/auth', authRoutes);
-app.use('/api/profiles', profileRoutes); 
+app.use('/api/users/profiles', profileRoutes);  // User saját profil kezeléshez
 app.use('/api/upload', uploadRoutes);
+app.use('/api/profiles', serviceProfilesRoutes);  // Public profil megtekintéshez
 
 // Existing routes
 app.get('/', (req, res) => {
@@ -101,12 +104,6 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`🔐 Auth test: http://localhost:${PORT}/api/auth/test`);
 console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);  });
 }
-
-// Export az app-ot teszteléshez
-module.exports = app;
-
-// Export az app-ot teszteléshez
-module.exports = app;
   // Graceful shutdown
   process.on('SIGTERM', () => {
     console.log('SIGTERM signal received: closing HTTP server');
