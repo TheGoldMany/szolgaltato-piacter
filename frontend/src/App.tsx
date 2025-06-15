@@ -5,12 +5,9 @@ import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import Dashboard from './pages/Dashboard';
 import HomePage from './pages/HomePage';
-import Navbar from './components/layout/Navbar';
 import ProfileEditor from './components/profile/ProfileEditor'; 
 import { ProfileView } from './components/profile';
 import ServiceProviders from './pages/ServiceProviders';
-
-// ✅ JAVÍTOTT IMPORT PATH:
 import ModularProfileEditor from './components/profile/ModularProfileEditor';
 import './App.css';
 
@@ -50,8 +47,6 @@ const App: React.FC = () => {
       <Router>
         <div className="App">
           <Routes>
-            {/* ✅ TISZTÍTOTT ROUTES - Duplikátumok eltávolítva */}
-            
             {/* Public Routes */}
             <Route path="/" element={<HomePage />} />
             <Route path="/services" element={<ServiceProviders />} />
@@ -94,7 +89,6 @@ const App: React.FC = () => {
               } 
             />
             
-            {/* ✅ EGYETLEN Moduláris Profil Szerkesztő Route */}
             <Route 
               path="/profile/modular-editor" 
               element={

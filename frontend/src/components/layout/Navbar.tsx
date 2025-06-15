@@ -1,3 +1,5 @@
+import React from 'react';
+
 const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isProfileOpen, setIsProfileOpen] = React.useState(false);
@@ -169,3 +171,5 @@ const Navbar: React.FC = () => {
     </nav>
   );
 };
+
+export default Navbar;
