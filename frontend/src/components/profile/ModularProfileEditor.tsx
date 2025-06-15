@@ -1,15 +1,7 @@
-// ModularProfileEditor.tsx - Javított verzió
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { DragDropContext } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Layout from '../layout/Layout';
 import Container from '../layout/Container';
 import Card from '../common/Card';
-
-// Ha a DndProvider import nem működik, próbáld ezt:
-// import { DragDropContext } from 'react-dnd';
-// Vagy egyszerűen kezdjük DnD nélkül és később adjuk hozzá
-
 // Types
 interface GridPosition {
   x: number;
@@ -23,21 +15,21 @@ interface ModuleData {
   type: ModuleType;
   position: GridPosition;
   content: any;
-  style?: any;
+  isVisible: boolean;
+  sortOrder: number;
 }
 
 type ModuleType = 
   | 'hero'
-  | 'introduction' 
-  | 'services'
+  | 'text' 
+  | 'image'
   | 'gallery'
   | 'video'
   | 'contact'
-  | 'reviews'
-  | 'certificates'
-  | 'timeline'
-  | 'pricing'
-  | 'stats';
+  | 'price_list'
+  | 'testimonial'
+  | 'stats'
+  | 'social';
 
 interface ModuleTemplate {
   type: ModuleType;
@@ -53,212 +45,188 @@ interface ModuleTemplate {
 const MODULE_TEMPLATES: ModuleTemplate[] = [
   {
     type: 'hero',
-    name: 'Hero Szekció',
+    name: 'Hero Banner',
     icon: '🎯',
-    defaultSize: { width: 2, height: 2 },
+    defaultSize: { width: 4, height: 2 },
     category: 'Bemutatkozás',
-    description: 'Főcím, profilkép és rövid bemutatkozás',
+    description: 'Főcím és profilkép',
     maxInstances: 1
   },
   {
-    type: 'introduction',
-    name: 'Bemutatkozás',
+    type: 'text',
+    name: 'Szövegblokk',
     icon: '📝',
     defaultSize: { width: 2, height: 2 },
     category: 'Bemutatkozás',
-    description: 'Részletes bemutatkozó szöveg'
-  },
-  {
-    type: 'services',
-    name: 'Szolgáltatások',
-    icon: '🛠️',
-    defaultSize: { width: 2, height: 3 },
-    category: 'Szolgáltatások',
-    description: 'Szolgáltatások listája árral'
-  },
-  {
-    type: 'gallery',
-    name: 'Képgaléria',
-    icon: '🖼️',
-    defaultSize: { width: 2, height: 2 },
-    category: 'Média',
-    description: 'Munkák és projektek képei'
-  },
-  {
-    type: 'video',
-    name: 'Videó',
-    icon: '🎥',
-    defaultSize: { width: 2, height: 2 },
-    category: 'Média',
-    description: 'Bemutatkozó videó'
+    description: 'Bemutatkozó szöveg'
   },
   {
     type: 'contact',
     name: 'Kapcsolat',
     icon: '📞',
-    defaultSize: { width: 1, height: 2 },
+    defaultSize: { width: 2, height: 2 },
     category: 'Kapcsolat',
     description: 'Elérhetőségek'
   },
   {
-    type: 'reviews',
-    name: 'Értékelések',
-    icon: '⭐',
-    defaultSize: { width: 2, height: 2 },
-    category: 'Hitelesség',
-    description: 'Ügyfél értékelések'
-  },
-  {
-    type: 'certificates',
-    name: 'Tanúsítványok',
-    icon: '🏆',
-    defaultSize: { width: 1, height: 2 },
-    category: 'Hitelesség',
-    description: 'Szakmai tanúsítványok'
+    type: 'price_list',
+    name: 'Árlista',
+    icon: '💰',
+    defaultSize: { width: 2, height: 3 },
+    category: 'Szolgáltatások',
+    description: 'Szolgáltatások és árak'
   },
   {
     type: 'stats',
     name: 'Statisztikák',
     icon: '📊',
-    defaultSize: { width: 2, height: 1 },
+    defaultSize: { width: 4, height: 1 },
     category: 'Bemutatkozás',
-    description: 'Fontos számok és eredmények'
+    description: 'Számlálók és eredmények'
+  },
+  {
+    type: 'gallery',
+    name: 'Képgaléria',
+    icon: '🖼️',
+    defaultSize: { width: 3, height: 2 },
+    category: 'Média',
+    description: 'Képek megjelenítése'
+  },
+  {
+    type: 'video',
+    name: 'Videó',
+    icon: '🎥',
+    defaultSize: { width: 3, height: 2 },
+    category: 'Média',
+    description: 'Videó beágyazás'
   }
 ];
 
 const GRID_CONFIG = {
-  desktop: { cols: 4, rows: 8, cellWidth: 280, cellHeight: 120 },
-  tablet: { cols: 3, rows: 11, cellWidth: 240, cellHeight: 100 },
-  mobile: { cols: 2, rows: 16, cellWidth: 160, cellHeight: 80 }
+  cols: 4,
+  rows: 8,
+  cellWidth: 200,
+  cellHeight: 100,
+  gap: 8
 };
 
 const ModularProfileEditor: React.FC = () => {
   const [modules, setModules] = useState<ModuleData[]>([]);
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
-  const [previewMode, setPreviewMode] = useState(false);
-  const [currentDevice, setCurrentDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
-  const [showModulePalette, setShowModulePalette] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [draggedFromPalette, setDraggedFromPalette] = useState<ModuleTemplate | null>(null);
+  const [draggedModule, setDraggedModule] = useState<ModuleData | null>(null);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [dropIndicator, setDropIndicator] = useState<GridPosition | null>(null);
   
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // Check if position is available
-  const isPositionAvailable = useCallback((position: GridPosition, excludeId?: string): boolean => {
-    const { cols, rows } = GRID_CONFIG[currentDevice];
-    
-    if (position.x < 0 || position.y < 0 || 
-        position.x + position.width > cols || 
-        position.y + position.height > rows) {
-      return false;
+  // Default modules
+  useEffect(() => {
+    if (modules.length === 0) {
+      const defaultModules: ModuleData[] = [
+        {
+          id: 'hero-1',
+          type: 'hero',
+          position: { x: 0, y: 0, width: 4, height: 2 },
+          content: {
+            title: 'Szolgáltatóm neve',
+            subtitle: 'Szakértelem rövid leírása'
+          },
+          isVisible: true,
+          sortOrder: 1
+        },
+        {
+          id: 'contact-1',
+          type: 'contact',
+          position: { x: 0, y: 2, width: 2, height: 2 },
+          content: {
+            phone: '+36 30 123 4567',
+            email: 'info@szolgaltato.hu',
+            address: 'Budapest'
+          },
+          isVisible: true,
+          sortOrder: 2
+        },
+        {
+          id: 'text-1',
+          type: 'text',
+          position: { x: 2, y: 2, width: 2, height: 2 },
+          content: {
+            title: 'Bemutatkozás',
+            content: 'Itt írhatsz magadról...'
+          },
+          isVisible: true,
+          sortOrder: 3
+        }
+      ];
+      setModules(defaultModules);
     }
+  }, [modules.length]);
 
-    return !modules.some(module => {
-      if (module.id === excludeId) return false;
+  // Check if position is occupied
+  const isPositionOccupied = useCallback((position: GridPosition, excludeId?: string) => {
+    return modules.some(module => {
+      if (excludeId && module.id === excludeId) return false;
       
-      const modulePos = module.position;
+      const moduleRight = module.position.x + module.position.width;
+      const moduleBottom = module.position.y + module.position.height;
+      const positionRight = position.x + position.width;
+      const positionBottom = position.y + position.height;
+      
       return !(
-        position.x >= modulePos.x + modulePos.width ||
-        position.x + position.width <= modulePos.x ||
-        position.y >= modulePos.y + modulePos.height ||
-        position.y + position.height <= modulePos.y
+        position.x >= moduleRight ||
+        positionRight <= module.position.x ||
+        position.y >= moduleBottom ||
+        positionBottom <= module.position.y
       );
     });
-  }, [modules, currentDevice]);
+  }, [modules]);
 
-  // Find next available position
-  const findAvailablePosition = useCallback((size: { width: number; height: number }): GridPosition | null => {
-    const { cols, rows } = GRID_CONFIG[currentDevice];
+  // Find available position
+  const findAvailablePosition = useCallback((moduleTemplate: ModuleTemplate): GridPosition | null => {
+    const { width, height } = moduleTemplate.defaultSize;
     
-    for (let y = 0; y <= rows - size.height; y++) {
-      for (let x = 0; x <= cols - size.width; x++) {
-        const position = { x, y, width: size.width, height: size.height };
-        if (isPositionAvailable(position)) {
+    for (let y = 0; y <= GRID_CONFIG.rows - height; y++) {
+      for (let x = 0; x <= GRID_CONFIG.cols - width; x++) {
+        const position = { x, y, width, height };
+        if (!isPositionOccupied(position)) {
           return position;
         }
       }
     }
     return null;
-  }, [isPositionAvailable, currentDevice]);
+  }, [isPositionOccupied]);
 
-  // Add module
-  const addModule = useCallback((template: ModuleTemplate) => {
-    // Check instance limit
-    if (template.maxInstances) {
-      const existingInstances = modules.filter(m => m.type === template.type).length;
-      if (existingInstances >= template.maxInstances) {
-        alert(`Csak ${template.maxInstances} darab ${template.name} modul helyezhető el!`);
-        return;
-      }
-    }
-
-    const position = findAvailablePosition(template.defaultSize);
-    
-    if (!position) {
-      alert('Nincs elegendő hely a modulhoz a rácsban!');
-      return;
-    }
-
-    const newModule: ModuleData = {
-      id: `module_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      type: template.type,
-      position,
-      content: getDefaultContent(template.type),
-      style: {}
-    };
-
-    setModules(prev => [...prev, newModule]);
-    setSelectedModule(newModule.id);
-  }, [findAvailablePosition, modules]);
-
-  // Get default content for module
-  const getDefaultContent = (type: ModuleType): any => {
+  // Get default content
+  const getDefaultContent = (type: ModuleType) => {
     switch (type) {
       case 'hero':
-        return {
-          title: 'Szolgáltató Neve',
-          subtitle: 'Szakma/Szakterület',
-          description: 'Rövid bemutatkozás és értékajánlat.',
-          profileImage: null
-        };
-      case 'introduction':
-        return {
-          title: 'Rólam',
-          text: 'Mutatkozz be részletesebben! Írd le tapasztalataidat, módszereidet és azt, hogy miért téged válasszanak.'
-        };
-      case 'services':
-        return {
-          title: 'Szolgáltatásaim',
-          services: [
-            { name: 'Alapszolgáltatás', price: '15.000 Ft', description: 'Leírás...' },
-            { name: 'Prémium csomag', price: '25.000 Ft', description: 'Leírás...' }
-          ]
-        };
+        return { title: 'Szolgáltató neve', subtitle: 'Szakértelem' };
+      case 'text':
+        return { title: 'Szövegblokk', content: 'Szöveg...' };
       case 'contact':
-        return {
-          title: 'Kapcsolat',
-          phone: '+36 30 123 4567',
-          email: 'email@example.com',
-          website: 'https://example.com',
-          address: 'Budapest'
+        return { phone: '+36 30 123 4567', email: 'info@example.hu', address: 'Budapest' };
+      case 'price_list':
+        return { 
+          title: 'Árlista', 
+          items: [
+            { service: 'Alapszolgáltatás', price: '15000', unit: 'projekt' },
+            { service: 'Prémium csomag', price: '25000', unit: 'projekt' }
+          ] 
         };
       case 'stats':
-        return {
-          stats: [
-            { label: 'Elégedett ügyfél', value: '150+', icon: '😊' },
-            { label: 'Befejezett projekt', value: '200+', icon: '✅' },
-            { label: 'Év tapasztalat', value: '5+', icon: '⭐' },
-            { label: 'Átlag értékelés', value: '4.9', icon: '🏆' }
-          ]
+        return { 
+          items: [
+            { label: 'Elégedett ügyfél', value: '100+', icon: '😊' },
+            { label: 'Projekt', value: '200+', icon: '✅' },
+            { label: 'Év tapasztalat', value: '5+', icon: '⭐' }
+          ] 
         };
-      case 'reviews':
-        return {
-          title: 'Mit mondanak rólam',
-          averageRating: 4.8,
-          totalReviews: 47,
-          reviews: [
-            { name: 'Kiss János', rating: 5, text: 'Kiváló szakember!', date: '2024-11-15' },
-            { name: 'Nagy Anna', rating: 5, text: 'Nagyon elégedett vagyok!', date: '2024-11-10' }
-          ]
-        };
+      case 'gallery':
+        return { title: 'Képgaléria', images: [], layout: 'grid' };
+      case 'video':
+        return { title: 'Bemutatkozó videó', videoUrl: '', thumbnail: null };
       default:
         return {};
     }
@@ -272,809 +240,1064 @@ const ModularProfileEditor: React.FC = () => {
     }
   }, [selectedModule]);
 
-  // Group modules by category
-  const modulesByCategory = MODULE_TEMPLATES.reduce((acc, template) => {
-    if (!acc[template.category]) {
-      acc[template.category] = [];
-    }
-    acc[template.category].push(template);
-    return acc;
-  }, {} as Record<string, ModuleTemplate[]>);
+  // Update module content
+  const updateModuleContent = useCallback((moduleId: string, newContent: any) => {
+    setModules(prev => prev.map(module =>
+      module.id === moduleId
+        ? { ...module, content: { ...module.content, ...newContent } }
+        : module
+    ));
+  }, []);
 
-  // Check if module can be added
-  const canAddModule = (template: ModuleTemplate): boolean => {
-    if (!template.maxInstances) return true;
-    const existingCount = modules.filter(m => m.type === template.type).length;
-    return existingCount < template.maxInstances;
+  // Get grid position from mouse coordinates
+  const getGridPositionFromMouse = useCallback((clientX: number, clientY: number) => {
+    if (!gridRef.current) return null;
+    
+    const rect = gridRef.current.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    
+    const gridX = Math.floor(x / (GRID_CONFIG.cellWidth + GRID_CONFIG.gap));
+    const gridY = Math.floor(y / (GRID_CONFIG.cellHeight + GRID_CONFIG.gap));
+    
+    return {
+      x: Math.max(0, Math.min(gridX, GRID_CONFIG.cols - 1)),
+      y: Math.max(0, Math.min(gridY, GRID_CONFIG.rows - 1))
+    };
+  }, []);
+
+  // Handle drag start from palette
+  const handlePaletteDragStart = useCallback((template: ModuleTemplate, e: React.DragEvent) => {
+    setDraggedFromPalette(template);
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', template.type);
+  }, []);
+
+  // Handle drag start from existing module
+  const handleModuleDragStart = useCallback((module: ModuleData, e: React.DragEvent) => {
+    setDraggedModule(module);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', module.id);
+    
+    // Calculate offset for smooth dragging
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+  }, []);
+
+  // Handle drag over grid
+  const handleGridDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = draggedFromPalette ? 'copy' : 'move';
+    
+    const gridPos = getGridPositionFromMouse(e.clientX, e.clientY);
+    if (!gridPos) return;
+    
+    let width, height;
+    if (draggedFromPalette) {
+      width = draggedFromPalette.defaultSize.width;
+      height = draggedFromPalette.defaultSize.height;
+    } else if (draggedModule) {
+      width = draggedModule.position.width;
+      height = draggedModule.position.height;
+    } else {
+      return;
+    }
+    
+    // Ensure module fits in grid
+    const adjustedWidth = Math.min(width, GRID_CONFIG.cols - gridPos.x);
+    const adjustedHeight = Math.min(height, GRID_CONFIG.rows - gridPos.y);
+    
+    const position: GridPosition = {
+      x: gridPos.x,
+      y: gridPos.y,
+      width: adjustedWidth,
+      height: adjustedHeight
+    };
+    
+    // Check if position is valid
+    const excludeId = draggedModule?.id;
+    if (!isPositionOccupied(position, excludeId)) {
+      setDropIndicator(position);
+    } else {
+      setDropIndicator(null);
+    }
+  }, [draggedFromPalette, draggedModule, getGridPositionFromMouse, isPositionOccupied]);
+
+  // Handle drop on grid
+  const handleGridDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    
+    if (!dropIndicator) return;
+    
+    if (draggedFromPalette) {
+      // Add new module from palette
+      if (draggedFromPalette.maxInstances) {
+        const existingCount = modules.filter(m => m.type === draggedFromPalette.type).length;
+        if (existingCount >= draggedFromPalette.maxInstances) {
+          alert(`Csak ${draggedFromPalette.maxInstances} darab ${draggedFromPalette.name} modul adható hozzá.`);
+          setDraggedFromPalette(null);
+          setDropIndicator(null);
+          return;
+        }
+      }
+      
+      const newModule: ModuleData = {
+        id: `${draggedFromPalette.type}-${Date.now()}`,
+        type: draggedFromPalette.type,
+        position: dropIndicator,
+        content: getDefaultContent(draggedFromPalette.type),
+        isVisible: true,
+        sortOrder: modules.length + 1
+      };
+      
+      setModules(prev => [...prev, newModule]);
+      setSelectedModule(newModule.id);
+      
+    } else if (draggedModule) {
+      // Move existing module
+      setModules(prev => prev.map(module =>
+        module.id === draggedModule.id
+          ? { ...module, position: dropIndicator }
+          : module
+      ));
+    }
+    
+    setDraggedFromPalette(null);
+    setDraggedModule(null);
+    setDropIndicator(null);
+  }, [dropIndicator, draggedFromPalette, draggedModule, modules, getDefaultContent]);
+
+  // Handle drag end
+  const handleDragEnd = useCallback(() => {
+    setDraggedFromPalette(null);
+    setDraggedModule(null);
+    setDropIndicator(null);
+  }, []);
+
+  // Render grid
+  const renderGrid = () => {
+    const cells = [];
+    for (let y = 0; y < GRID_CONFIG.rows; y++) {
+      for (let x = 0; x < GRID_CONFIG.cols; x++) {
+        cells.push(
+          <div
+            key={`${x}-${y}`}
+            style={{
+              position: 'absolute',
+              left: x * (GRID_CONFIG.cellWidth + GRID_CONFIG.gap),
+              top: y * (GRID_CONFIG.cellHeight + GRID_CONFIG.gap),
+              width: GRID_CONFIG.cellWidth,
+              height: GRID_CONFIG.cellHeight,
+              border: '1px dashed #e0e0e0',
+              backgroundColor: '#fafafa'
+            }}
+          />
+        );
+      }
+    }
+    return cells;
+  };
+
+  // Render drop indicator
+  const renderDropIndicator = () => {
+    if (!dropIndicator) return null;
+    
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          left: dropIndicator.x * (GRID_CONFIG.cellWidth + GRID_CONFIG.gap),
+          top: dropIndicator.y * (GRID_CONFIG.cellHeight + GRID_CONFIG.gap),
+          width: dropIndicator.width * GRID_CONFIG.cellWidth + (dropIndicator.width - 1) * GRID_CONFIG.gap,
+          height: dropIndicator.height * GRID_CONFIG.cellHeight + (dropIndicator.height - 1) * GRID_CONFIG.gap,
+          backgroundColor: 'rgba(59, 130, 246, 0.2)',
+          border: '2px dashed #3b82f6',
+          borderRadius: '8px',
+          pointerEvents: 'none',
+          zIndex: 1000
+        }}
+      />
+    );
+  };
+
+  // Render module
+  const renderModule = (module: ModuleData) => {
+    const { position } = module;
+    const isSelected = selectedModule === module.id;
+    const isDragging = draggedModule?.id === module.id;
+
+    const style = {
+      position: 'absolute' as const,
+      left: position.x * (GRID_CONFIG.cellWidth + GRID_CONFIG.gap),
+      top: position.y * (GRID_CONFIG.cellHeight + GRID_CONFIG.gap),
+      width: position.width * GRID_CONFIG.cellWidth + (position.width - 1) * GRID_CONFIG.gap,
+      height: position.height * GRID_CONFIG.cellHeight + (position.height - 1) * GRID_CONFIG.gap,
+      backgroundColor: 'white',
+      border: isSelected ? '2px solid #3b82f6' : '1px solid #e0e0e0',
+      borderRadius: '8px',
+      padding: '12px',
+      cursor: 'move',
+      boxShadow: isSelected ? '0 4px 12px rgba(59, 130, 246, 0.3)' : '0 1px 3px rgba(0,0,0,0.1)',
+      opacity: isDragging ? 0.5 : 1,
+      zIndex: isSelected ? 10 : 1
+    };
+
+    return (
+      <div
+        key={module.id}
+        style={style}
+        draggable
+        onDragStart={(e) => handleModuleDragStart(module, e)}
+        onDragEnd={handleDragEnd}
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelectedModule(module.id);
+        }}
+      >
+        {isSelected && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              removeModule(module.id);
+            }}
+            style={{
+              position: 'absolute',
+              top: '4px',
+              right: '4px',
+              width: '24px',
+              height: '24px',
+              backgroundColor: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '50%',
+              fontSize: '12px',
+              cursor: 'pointer',
+              zIndex: 11
+            }}
+          >
+            ×
+          </button>
+        )}
+        
+        <ModuleRenderer module={module} />
+      </div>
+    );
+  };
+
+  // Save profile
+  const saveProfile = async () => {
+    setIsLoading(true);
+    try {
+      console.log('Saving modules:', modules);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      alert('Profil sikeresen mentve!');
+    } catch (error) {
+      alert('Hiba történt a mentés során!');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <Layout>
-      <Container className="py-8">
-        
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 mb-6">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">🎨 Moduláris Profil Szerkesztő</h1>
-              <p className="text-gray-600">
-                Hozd létre egyedi profilodat modulokkal! {modules.length}/20 modul
-              </p>
-            </div>
-            
-            {/* Controls */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPreviewMode(!previewMode)}
-                className={`btn btn-sm ${previewMode ? 'btn-secondary' : 'btn-outline'}`}
-              >
-                {previewMode ? '✏️ Szerkesztés' : '👁️ Előnézet'}
-              </button>
-              
-              <button className="btn btn-primary btn-sm">
-                💾 Mentés
-              </button>
-            </div>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
+      {/* Header */}
+      <div style={{ backgroundColor: 'white', borderBottom: '1px solid #e0e0e0', padding: '16px' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0' }}>
+              🎨 Moduláris Profil Szerkesztő
+            </h1>
+            <p style={{ color: '#666', margin: 0 }}>
+              Húzd át a modulokat a rácsra és szabd személyre!
+            </p>
           </div>
+          
+          <button
+            onClick={saveProfile}
+            disabled={isLoading}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              opacity: isLoading ? 0.5 : 1
+            }}
+          >
+            {isLoading ? '💾 Mentés...' : '💾 Mentés'}
+          </button>
+        </div>
+      </div>
 
-          {/* Device Switcher */}
-          <div className="flex gap-2 mb-4">
-            {(['desktop', 'tablet', 'mobile'] as const).map(device => (
-              <button
-                key={device}
-                onClick={() => setCurrentDevice(device)}
-                className={`btn btn-sm ${currentDevice === device ? 'btn-primary' : 'btn-outline'}`}
-              >
-                {device === 'desktop' ? '🖥️ Desktop' : 
-                 device === 'tablet' ? '📱 Tablet' : 
-                 '📱 Mobil'}
-              </button>
+      {/* Main Content */}
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px', display: 'grid', gridTemplateColumns: '250px 1fr 300px', gap: '24px' }}>
+        
+        {/* Module Palette */}
+        <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', height: 'fit-content' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0' }}>
+            <h2 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>📦 Modulok</h2>
+            <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>Húzd át a rácsra!</p>
+          </div>
+          
+          <div style={{ padding: '16px' }}>
+            {Object.entries(
+              MODULE_TEMPLATES.reduce((acc, template) => {
+                if (!acc[template.category]) acc[template.category] = [];
+                acc[template.category].push(template);
+                return acc;
+              }, {} as Record<string, ModuleTemplate[]>)
+            ).map(([category, templates]) => (
+              <div key={category} style={{ marginBottom: '16px' }}>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#374151' }}>{category}</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {templates.map(template => {
+                    const canAdd = !template.maxInstances || 
+                      modules.filter(m => m.type === template.type).length < template.maxInstances;
+                    
+                    return (
+                      <div
+                        key={template.type}
+                        draggable={canAdd}
+                        onDragStart={(e) => canAdd && handlePaletteDragStart(template, e)}
+                        style={{
+                          padding: '12px',
+                          border: '1px solid #e0e0e0',
+                          borderRadius: '6px',
+                          backgroundColor: canAdd ? 'white' : '#f9fafb',
+                          cursor: canAdd ? 'move' : 'not-allowed',
+                          textAlign: 'left',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          transition: 'all 0.2s',
+                          opacity: canAdd ? 1 : 0.5
+                        }}
+                        onMouseEnter={(e) => {
+                          if (canAdd) {
+                            e.currentTarget.style.backgroundColor = '#f3f4f6';
+                            e.currentTarget.style.borderColor = '#3b82f6';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (canAdd) {
+                            e.currentTarget.style.backgroundColor = 'white';
+                            e.currentTarget.style.borderColor = '#e0e0e0';
+                          }
+                        }}
+                      >
+                        <span style={{ fontSize: '18px' }}>{template.icon}</span>
+                        <div>
+                          <div style={{ fontSize: '14px', fontWeight: '500' }}>{template.name}</div>
+                          <div style={{ fontSize: '12px', color: '#666' }}>
+                            {template.defaultSize.width}×{template.defaultSize.height}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             ))}
           </div>
         </div>
 
-        <div className="flex gap-6">
+        {/* Grid Area */}
+        <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0' }}>
+            <h2 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>🎯 Profil Előnézet (4×8 rács)</h2>
+            <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+              {modules.length} modul elhelyezve • Húzd át a modulokat!
+            </p>
+          </div>
           
-          {/* Module Palette */}
-          {!previewMode && showModulePalette && (
-            <div className="w-80 max-h-screen overflow-y-auto">
-              <Card>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold">📦 Modul Paletta</h3>
-                  <button
-                    onClick={() => setShowModulePalette(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    ✕
-                  </button>
-                </div>
-                
-                <div className="space-y-6">
-                  {Object.entries(modulesByCategory).map(([category, templates]) => (
-                    <div key={category}>
-                      <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
-                        {category === 'Bemutatkozás' ? '👋' :
-                         category === 'Média' ? '🎬' :
-                         category === 'Szolgáltatások' ? '💼' :
-                         category === 'Kapcsolat' ? '📞' : '🏆'}
-                        {category}
-                      </h4>
-                      <div className="space-y-2">
-                        {templates.map(template => {
-                          const isDisabled = !canAddModule(template);
-                          const existingCount = modules.filter(m => m.type === template.type).length;
-                          
-                          return (
-                            <div
-                              key={template.type}
-                              onClick={isDisabled ? undefined : () => addModule(template)}
-                              className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                                isDisabled 
-                                  ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed' 
-                                  : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
-                              }`}
-                            >
-                              <div className="flex items-start gap-3">
-                                <span className="text-2xl">{template.icon}</span>
-                                <div className="flex-1">
-                                  <div className="font-medium text-sm flex items-center gap-2">
-                                    {template.name}
-                                    {template.maxInstances && (
-                                      <span className="text-xs bg-gray-200 px-2 py-1 rounded">
-                                        {existingCount}/{template.maxInstances}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    {template.description}
-                                  </div>
-                                  <div className="text-xs text-blue-600 mt-1">
-                                    {template.defaultSize.width}×{template.defaultSize.height}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* Toggle Palette Button */}
-          {!previewMode && !showModulePalette && (
-            <button
-              onClick={() => setShowModulePalette(true)}
-              className="fixed left-4 top-1/2 transform -translate-y-1/2 btn btn-primary btn-sm z-10 shadow-lg"
+          <div style={{ padding: '24px' }}>
+            <div
+              ref={gridRef}
+              style={{
+                position: 'relative',
+                width: GRID_CONFIG.cols * GRID_CONFIG.cellWidth + (GRID_CONFIG.cols - 1) * GRID_CONFIG.gap,
+                height: GRID_CONFIG.rows * GRID_CONFIG.cellHeight + (GRID_CONFIG.rows - 1) * GRID_CONFIG.gap,
+                margin: '0 auto',
+                border: '2px dashed #cbd5e1',
+                borderRadius: '8px',
+                backgroundColor: '#f8fafc'
+              }}
+              onDragOver={handleGridDragOver}
+              onDrop={handleGridDrop}
+              onDragLeave={() => setDropIndicator(null)}
+              onClick={() => setSelectedModule(null)}
             >
-              📦
-            </button>
-          )}
-
-          {/* Grid Editor */}
-          <div className="flex-1">
-            <Card className="p-0 overflow-hidden">
-              
-              {/* Grid Info */}
-              <div className="p-4 border-b bg-gray-50">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-sm text-gray-600">
-                  <span>
-                    Rács: {GRID_CONFIG[currentDevice].cols}×{GRID_CONFIG[currentDevice].rows} 
-                    ({modules.length} modul)
-                  </span>
-                  <span>
-                    Cella: {GRID_CONFIG[currentDevice].cellWidth}×{GRID_CONFIG[currentDevice].cellHeight}px
-                  </span>
-                </div>
-              </div>
-
-              {/* Grid Canvas */}
-              <div className="p-6">
-                <div
-                  ref={gridRef}
-                  className="relative border-2 border-dashed border-gray-300 bg-white mx-auto"
-                  style={{
-                    width: GRID_CONFIG[currentDevice].cols * GRID_CONFIG[currentDevice].cellWidth,
-                    height: GRID_CONFIG[currentDevice].rows * GRID_CONFIG[currentDevice].cellHeight,
-                    maxWidth: '100%'
-                  }}
-                >
-                  
-                  {/* Grid Lines */}
-                  <div className="absolute inset-0 pointer-events-none">
-                    {/* Vertical lines */}
-                    {Array.from({ length: GRID_CONFIG[currentDevice].cols + 1 }).map((_, i) => (
-                      <div
-                        key={`v-${i}`}
-                        className="absolute top-0 bottom-0 border-l border-gray-200"
-                        style={{ left: i * GRID_CONFIG[currentDevice].cellWidth }}
-                      />
-                    ))}
-                    {/* Horizontal lines */}
-                    {Array.from({ length: GRID_CONFIG[currentDevice].rows + 1 }).map((_, i) => (
-                      <div
-                        key={`h-${i}`}
-                        className="absolute left-0 right-0 border-t border-gray-200"
-                        style={{ top: i * GRID_CONFIG[currentDevice].cellHeight }}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Modules */}
-                  {modules.map(module => (
-                    <ModuleComponent
-                      key={module.id}
-                      module={module}
-                      isSelected={selectedModule === module.id}
-                      isPreview={previewMode}
-                      cellWidth={GRID_CONFIG[currentDevice].cellWidth}
-                      cellHeight={GRID_CONFIG[currentDevice].cellHeight}
-                      onSelect={() => setSelectedModule(module.id)}
-                      onRemove={() => removeModule(module.id)}
-                    />
-                  ))}
-
-                  {/* Empty State */}
-                  {modules.length === 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center text-gray-400">
-                        <div className="text-4xl mb-4">🎨</div>
-                        <h3 className="text-lg font-medium mb-2">Üres profil</h3>
-                        <p className="text-sm">
-                          Kezdj hozzá modulok hozzáadásával a bal oldali palettáról!
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
+              {renderGrid()}
+              {renderDropIndicator()}
+              {modules.map(renderModule)}
+            </div>
           </div>
         </div>
 
-        {/* Module Inspector */}
-        {selectedModule && !previewMode && (
-          <div className="mt-6">
-            <Card>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">⚙️ Modul Beállítások</h3>
-                <button
-                  onClick={() => removeModule(selectedModule)}
-                  className="btn btn-danger btn-sm"
-                >
-                  🗑️ Törlés
-                </button>
-              </div>
-              <ModuleInspector
+        {/* Settings Panel */}
+        <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', height: 'fit-content' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0' }}>
+            <h2 style={{ margin: 0, fontSize: '18px' }}>⚙️ Beállítások</h2>
+          </div>
+          
+          <div style={{ padding: '16px' }}>
+            {selectedModule ? (
+              <ModuleSettings
                 module={modules.find(m => m.id === selectedModule)!}
-                onUpdate={(updatedModule) => {
-                  setModules(prev => prev.map(m => 
-                    m.id === selectedModule ? updatedModule : m
-                  ));
-                }}
+                onUpdate={(content) => updateModuleContent(selectedModule, content)}
+                onRemove={() => removeModule(selectedModule)}
               />
-            </Card>
+            ) : (
+              <div style={{ textAlign: 'center', color: '#666', padding: '20px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>Válassz ki egy modult!</h3>
+                <p style={{ margin: 0, fontSize: '14px' }}>
+                  Kattints egy modulra a rácsban a szerkesztéshez.
+                </p>
+              </div>
+            )}
           </div>
-        )}
-
-      </Container>
-    </Layout>
-  );
-};
-
-// Module Component
-interface ModuleComponentProps {
-  module: ModuleData;
-  isSelected: boolean;
-  isPreview: boolean;
-  cellWidth: number;
-  cellHeight: number;
-  onSelect: () => void;
-  onRemove: () => void;
-}
-
-const ModuleComponent: React.FC<ModuleComponentProps> = ({
-  module,
-  isSelected,
-  isPreview,
-  cellWidth,
-  cellHeight,
-  onSelect,
-  onRemove
-}) => {
-  const style = {
-    position: 'absolute' as const,
-    left: module.position.x * cellWidth,
-    top: module.position.y * cellHeight,
-    width: module.position.width * cellWidth,
-    height: module.position.height * cellHeight,
-    zIndex: isSelected ? 10 : 1
-  };
-
-  return (
-    <div
-      style={style}
-      onClick={onSelect}
-      className={`
-        border-2 rounded-lg overflow-hidden cursor-pointer transition-all
-        ${isSelected ? 'border-blue-500 shadow-lg' : 'border-gray-300'}
-        ${isPreview ? '' : 'hover:border-blue-400'}
-      `}
-    >
-      {/* Module Header (Edit mode only) */}
-      {!isPreview && (
-        <div className="absolute top-0 right-0 z-20 flex gap-1 p-1">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove();
-            }}
-            className="w-6 h-6 bg-red-500 text-white rounded text-xs hover:bg-red-600 flex items-center justify-center"
-          >
-            ✕
-          </button>
         </div>
-      )}
-
-      {/* Module Content */}
-      <div className="w-full h-full p-3 bg-white">
-        <ModuleRenderer module={module} isPreview={isPreview} />
       </div>
     </div>
   );
 };
 
-// Module Content Renderer
-interface ModuleRendererProps {
+// Module Settings Component
+const ModuleSettings: React.FC<{
   module: ModuleData;
-  isPreview: boolean;
-}
+  onUpdate: (content: any) => void;
+  onRemove: () => void;
+}> = ({ module, onUpdate, onRemove }) => {
+  const [localContent, setLocalContent] = useState(module.content);
 
-const ModuleRenderer: React.FC<ModuleRendererProps> = ({ module, isPreview }) => {
-  switch (module.type) {
-    case 'hero':
-      return (
-        <div className="text-center h-full flex flex-col justify-center">
-          <div className="w-16 h-16 bg-gray-300 rounded-full mx-auto mb-2"></div>
-          <h3 className="font-bold text-lg">{module.content.title}</h3>
-          <p className="text-sm text-gray-600">{module.content.subtitle}</p>
-          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{module.content.description}</p>
-        </div>
-      );
-    
-    case 'introduction':
-      return (
-        <div className="h-full">
-          <h4 className="font-semibold mb-2">{module.content.title || '📝 Bemutatkozás'}</h4>
-          <p className="text-sm text-gray-600 line-clamp-4">{module.content.text}</p>
-        </div>
-      );
-    
-    case 'services':
-      return (
-        <div className="h-full">
-          <h4 className="font-semibold mb-2">{module.content.title || '🛠️ Szolgáltatások'}</h4>
-          <div className="space-y-2">
-            {module.content.services?.slice(0, 3).map((service: any, index: number) => (
-              <div key={index} className="text-sm">
-                <div className="font-medium">{service.name}</div>
-                <div className="text-blue-600 text-xs">{service.price}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    
-    case 'contact':
-      return (
-        <div className="h-full">
-          <h4 className="font-semibold mb-2">{module.content.title || '📞 Kapcsolat'}</h4>
-          <div className="text-sm space-y-1">
-            <div>📱 {module.content.phone}</div>
-            <div>✉️ {module.content.email}</div>
-            {module.content.website && <div>🌐 Weboldal</div>}
-          </div>
-        </div>
-      );
-    
-    case 'stats':
-      return (
-        <div className="h-full">
-          <h4 className="font-semibold mb-2">📊 Statisztikák</h4>
-          <div className="grid grid-cols-2 gap-2">
-            {module.content.stats?.slice(0, 4).map((stat: any, index: number) => (
-              <div key={index} className="text-center">
-                <div className="text-lg font-bold text-blue-600">{stat.value}</div>
-                <div className="text-xs text-gray-600">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    
-    case 'gallery':
-      return (
-        <div className="h-full">
-          <h4 className="font-semibold mb-2">🖼️ Galéria</h4>
-          <div className="grid grid-cols-2 gap-2 h-20">
-            {[1,2,3,4].map(i => (
-              <div key={i} className="bg-gray-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      );
+  useEffect(() => {
+    setLocalContent(module.content);
+  }, [module.content]);
 
-    case 'reviews':
-      return (
-        <div className="h-full">
-          <h4 className="font-semibold mb-2">⭐ Értékelések</h4>
-          <div className="text-sm">
-            <div className="flex items-center gap-1 mb-2">
-              <span className="text-yellow-500">⭐⭐⭐⭐⭐</span>
-              <span className="font-medium">{module.content.averageRating || 4.8}</span>
-              <span className="text-gray-500">({module.content.totalReviews || 47})</span>
-            </div>
-            {module.content.reviews?.slice(0, 1).map((review: any, index: number) => (
-              <div key={index} className="text-xs text-gray-600">
-                "{review.text}" - {review.name}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    
-    default:
-      return (
-        <div className="h-full flex items-center justify-center text-gray-400">
-          <div className="text-center">
-            <div className="text-2xl mb-2">🧩</div>
-            <div className="text-sm">{module.type}</div>
-          </div>
-        </div>
-      );
-  }
-};
-
-// Module Inspector for editing
-interface ModuleInspectorProps {
-  module: ModuleData;
-  onUpdate: (module: ModuleData) => void;
-}
-
-const ModuleInspector: React.FC<ModuleInspectorProps> = ({ module, onUpdate }) => {
-  const updateContent = (newContent: any) => {
-    onUpdate({
-      ...module,
-      content: { ...module.content, ...newContent }
-    });
+  const handleInputChange = (field: string, value: any) => {
+    const newContent = { ...localContent, [field]: value };
+    setLocalContent(newContent);
+    onUpdate(newContent);
   };
 
-  switch (module.type) {
+  const handleArrayUpdate = (field: string, index: number, itemField: string, value: any) => {
+    const array = localContent[field] || [];
+    const newArray = [...array];
+    newArray[index] = { ...newArray[index], [itemField]: value };
+    const newContent = { ...localContent, [field]: newArray };
+    setLocalContent(newContent);
+    onUpdate(newContent);
+  };
+
+  const addArrayItem = (field: string, defaultItem: any) => {
+    const array = localContent[field] || [];
+    const newContent = { ...localContent, [field]: [...array, defaultItem] };
+    setLocalContent(newContent);
+    onUpdate(newContent);
+  };
+
+  const removeArrayItem = (field: string, index: number) => {
+    const array = localContent[field] || [];
+    const newContent = { ...localContent, [field]: array.filter((_: any, i: number) => i !== index) };
+    setLocalContent(newContent);
+    onUpdate(newContent);
+  };
+
+  const getModuleName = (type: ModuleType) => {
+    const names = {
+      hero: 'Hero Banner',
+      text: 'Szövegblokk',
+      contact: 'Kapcsolat',
+      price_list: 'Árlista',
+      stats: 'Statisztikák',
+      gallery: 'Képgaléria',
+      video: 'Videó',
+      image: 'Kép',
+      testimonial: 'Értékelések',
+      social: 'Közösségi média'
+    };
+    return names[type] || 'Modul';
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid #f0f0f0' }}>
+        <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', color: '#1f2937' }}>
+          {getModuleName(module.type)}
+        </h3>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <span style={{ fontSize: '12px', color: '#6b7280', padding: '2px 6px', backgroundColor: '#f3f4f6', borderRadius: '4px' }}>
+            {module.position.width}×{module.position.height}
+          </span>
+          <button
+            onClick={onRemove}
+            style={{
+              fontSize: '12px',
+              color: '#dc2626',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '2px 6px'
+            }}
+          >
+            🗑️ Törlés
+          </button>
+        </div>
+      </div>
+
+      <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+        {/* Hero Module Settings */}
+        {module.type === 'hero' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px', color: '#374151' }}>
+                Főcím
+              </label>
+              <input
+                type="text"
+                value={localContent.title || ''}
+                onChange={(e) => handleInputChange('title', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                placeholder="Szolgáltató neve"
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px', color: '#374151' }}>
+                Alcím
+              </label>
+              <input
+                type="text"
+                value={localContent.subtitle || ''}
+                onChange={(e) => handleInputChange('subtitle', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                placeholder="Szakértelem leírása"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Text Module Settings */}
+        {module.type === 'text' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px', color: '#374151' }}>
+                Cím
+              </label>
+              <input
+                type="text"
+                value={localContent.title || ''}
+                onChange={(e) => handleInputChange('title', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                placeholder="Szekció címe"
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px', color: '#374151' }}>
+                Szöveg
+              </label>
+              <textarea
+                value={localContent.content || ''}
+                onChange={(e) => handleInputChange('content', e.target.value)}
+                rows={4}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  resize: 'vertical'
+                }}
+                placeholder="Itt írhatsz magadról..."
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Contact Module Settings */}
+        {module.type === 'contact' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px', color: '#374151' }}>
+                Telefon
+              </label>
+              <input
+                type="tel"
+                value={localContent.phone || ''}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                placeholder="+36 30 123 4567"
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px', color: '#374151' }}>
+                Email
+              </label>
+              <input
+                type="email"
+                value={localContent.email || ''}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                placeholder="info@example.hu"
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px', color: '#374151' }}>
+                Cím
+              </label>
+              <input
+                type="text"
+                value={localContent.address || ''}
+                onChange={(e) => handleInputChange('address', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                placeholder="Budapest"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Price List Module Settings */}
+        {module.type === 'price_list' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px', color: '#374151' }}>
+                Árlista címe
+              </label>
+              <input
+                type="text"
+                value={localContent.title || ''}
+                onChange={(e) => handleInputChange('title', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                placeholder="Árlista"
+              />
+            </div>
+            
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>Szolgáltatások</label>
+                <button
+                  onClick={() => addArrayItem('items', { service: 'Új szolgáltatás', price: '0', unit: 'db' })}
+                  style={{
+                    fontSize: '12px',
+                    color: '#3b82f6',
+                    backgroundColor: 'transparent',
+                    border: '1px solid #3b82f6',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  + Hozzáadás
+                </button>
+              </div>
+              
+              {(localContent.items || []).map((item: any, index: number) => (
+                <div key={index} style={{ border: '1px solid #e5e7eb', borderRadius: '6px', padding: '12px', marginBottom: '8px', backgroundColor: '#f9fafb' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <input
+                        type="text"
+                        value={item.service || ''}
+                        onChange={(e) => handleArrayUpdate('items', index, 'service', e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          marginBottom: '6px'
+                        }}
+                        placeholder="Szolgáltatás neve"
+                      />
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="number"
+                          value={item.price || ''}
+                          onChange={(e) => handleArrayUpdate('items', index, 'price', e.target.value)}
+                          style={{
+                            flex: 1,
+                            padding: '6px 8px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            fontSize: '12px'
+                          }}
+                          placeholder="Ár"
+                        />
+                        <select
+                          value={item.unit || 'db'}
+                          onChange={(e) => handleArrayUpdate('items', index, 'unit', e.target.value)}
+                          style={{
+                            padding: '6px 8px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            fontSize: '12px'
+                          }}
+                        >
+                          <option value="db">db</option>
+                          <option value="óra">óra</option>
+                          <option value="nap">nap</option>
+                          <option value="m²">m²</option>
+                          <option value="projekt">projekt</option>
+                        </select>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeArrayItem('items', index)}
+                      style={{
+                        marginLeft: '8px',
+                        fontSize: '12px',
+                        color: '#dc2626',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Stats Module Settings */}
+        {module.type === 'stats' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>Statisztikák</label>
+                <button
+                  onClick={() => addArrayItem('items', { label: 'Új statisztika', value: '0', icon: '📊' })}
+                  style={{
+                    fontSize: '12px',
+                    color: '#3b82f6',
+                    backgroundColor: 'transparent',
+                    border: '1px solid #3b82f6',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  + Hozzáadás
+                </button>
+              </div>
+              
+              {(localContent.items || []).map((item: any, index: number) => (
+                <div key={index} style={{ border: '1px solid #e5e7eb', borderRadius: '6px', padding: '12px', marginBottom: '8px', backgroundColor: '#f9fafb' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                        <input
+                          type="text"
+                          value={item.icon || ''}
+                          onChange={(e) => handleArrayUpdate('items', index, 'icon', e.target.value)}
+                          style={{
+                            width: '40px',
+                            padding: '6px 8px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            textAlign: 'center'
+                          }}
+                          placeholder="📊"
+                        />
+                        <input
+                          type="text"
+                          value={item.value || ''}
+                          onChange={(e) => handleArrayUpdate('items', index, 'value', e.target.value)}
+                          style={{
+                            width: '60px',
+                            padding: '6px 8px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            fontSize: '12px'
+                          }}
+                          placeholder="100+"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={item.label || ''}
+                        onChange={(e) => handleArrayUpdate('items', index, 'label', e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '4px',
+                          fontSize: '12px'
+                        }}
+                        placeholder="Statisztika címe"
+                      />
+                    </div>
+                    <button
+                      onClick={() => removeArrayItem('items', index)}
+                      style={{
+                        marginLeft: '8px',
+                        fontSize: '12px',
+                        color: '#dc2626',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Gallery Module Settings */}
+        {module.type === 'gallery' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px', color: '#374151' }}>
+                Galéria címe
+              </label>
+              <input
+                type="text"
+                value={localContent.title || ''}
+                onChange={(e) => handleInputChange('title', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                placeholder="Képgaléria"
+              />
+            </div>
+            <div style={{ textAlign: 'center', padding: '20px', backgroundColor: '#f9fafb', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+              <div style={{ fontSize: '24px', marginBottom: '8px' }}>📸</div>
+              <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>
+                Képfeltöltés funkció hamarosan...
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Video Module Settings */}
+        {module.type === 'video' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px', color: '#374151' }}>
+                Videó címe
+              </label>
+              <input
+                type="text"
+                value={localContent.title || ''}
+                onChange={(e) => handleInputChange('title', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                placeholder="Bemutatkozó videó"
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px', color: '#374151' }}>
+                YouTube/Vimeo URL
+              </label>
+              <input
+                type="url"
+                value={localContent.videoUrl || ''}
+                onChange={(e) => handleInputChange('videoUrl', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                placeholder="https://www.youtube.com/watch?v=..."
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Module Renderer Component
+const ModuleRenderer: React.FC<{ module: ModuleData }> = ({ module }) => {
+  const { type, content } = module;
+
+  const commonStyle = {
+    height: '100%',
+    overflow: 'hidden'
+  };
+
+  switch (type) {
     case 'hero':
       return (
-        <div className="space-y-4">
-          <div>
-            <label className="form-label">Cím</label>
-            <input
-              className="input-field"
-              value={module.content.title || ''}
-              onChange={(e) => updateContent({ title: e.target.value })}
-              placeholder="Szolgáltató neve"
-            />
-          </div>
-          <div>
-            <label className="form-label">Alcím</label>
-            <input
-              className="input-field"
-              value={module.content.subtitle || ''}
-              onChange={(e) => updateContent({ subtitle: e.target.value })}
-              placeholder="Szakma/szakterület"
-            />
-          </div>
-          <div>
-            <label className="form-label">Rövid leírás</label>
-            <textarea
-              className="input-field"
-              value={module.content.description || ''}
-              onChange={(e) => updateContent({ description: e.target.value })}
-              placeholder="Rövid bemutatkozás..."
-              rows={3}
-            />
-          </div>
+        <div style={{ 
+          ...commonStyle, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+          color: 'white', 
+          borderRadius: '6px', 
+          textAlign: 'center' 
+        }}>
+          <h2 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 'bold' }}>
+            {content.title || 'Szolgáltató neve'}
+          </h2>
+          <p style={{ margin: 0, fontSize: '12px', opacity: 0.9 }}>
+            {content.subtitle || 'Szakértelem'}
+          </p>
         </div>
       );
-    
-    case 'introduction':
+      
+    case 'text':
       return (
-        <div className="space-y-4">
-          <div>
-            <label className="form-label">Címsor</label>
-            <input
-              className="input-field"
-              value={module.content.title || ''}
-              onChange={(e) => updateContent({ title: e.target.value })}
-              placeholder="Rólam"
-            />
-          </div>
-          <div>
-            <label className="form-label">Bemutatkozó szöveg</label>
-            <textarea
-              className="input-field"
-              value={module.content.text || ''}
-              onChange={(e) => updateContent({ text: e.target.value })}
-              placeholder="Mutatkozz be részletesebben..."
-              rows={5}
-            />
-          </div>
+        <div style={commonStyle}>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600' }}>
+            {content.title || 'Szövegblokk'}
+          </h3>
+          <p style={{ margin: 0, fontSize: '12px', color: '#666', lineHeight: '1.4' }}>
+            {content.content?.length > 100 
+              ? content.content.substring(0, 100) + '...' 
+              : content.content || 'Itt lesz a szöveg...'}
+          </p>
         </div>
       );
-    
-    case 'services':
-      return (
-        <div className="space-y-4">
-          <div>
-            <label className="form-label">Címsor</label>
-            <input
-              className="input-field"
-              value={module.content.title || ''}
-              onChange={(e) => updateContent({ title: e.target.value })}
-              placeholder="Szolgáltatásaim"
-            />
-          </div>
-          <div>
-            <label className="form-label">Szolgáltatások</label>
-            {module.content.services?.map((service: any, index: number) => (
-              <div key={index} className="border rounded-lg p-3 mb-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <input
-                    className="input-field"
-                    value={service.name || ''}
-                    onChange={(e) => {
-                      const newServices = [...module.content.services];
-                      newServices[index] = { ...service, name: e.target.value };
-                      updateContent({ services: newServices });
-                    }}
-                    placeholder="Szolgáltatás neve"
-                  />
-                  <input
-                    className="input-field"
-                    value={service.price || ''}
-                    onChange={(e) => {
-                      const newServices = [...module.content.services];
-                      newServices[index] = { ...service, price: e.target.value };
-                      updateContent({ services: newServices });
-                    }}
-                    placeholder="Ár"
-                  />
-                </div>
-                <textarea
-                  className="input-field mt-2"
-                  value={service.description || ''}
-                  onChange={(e) => {
-                    const newServices = [...module.content.services];
-                    newServices[index] = { ...service, description: e.target.value };
-                    updateContent({ services: newServices });
-                  }}
-                  placeholder="Szolgáltatás leírása"
-                  rows={2}
-                />
-                <button
-                  onClick={() => {
-                    const newServices = module.content.services.filter((_: any, i: number) => i !== index);
-                    updateContent({ services: newServices });
-                  }}
-                  className="btn btn-danger btn-sm mt-2"
-                >
-                  Törlés
-                </button>
-              </div>
-            ))}
-            <button
-              onClick={() => {
-                const newServices = [...(module.content.services || []), { name: '', price: '', description: '' }];
-                updateContent({ services: newServices });
-              }}
-              className="btn btn-outline w-full"
-            >
-              + Új szolgáltatás
-            </button>
-          </div>
-        </div>
-      );
-    
+      
     case 'contact':
       return (
-        <div className="space-y-4">
-          <div>
-            <label className="form-label">Címsor</label>
-            <input
-              className="input-field"
-              value={module.content.title || ''}
-              onChange={(e) => updateContent({ title: e.target.value })}
-              placeholder="Kapcsolat"
-            />
-          </div>
-          <div>
-            <label className="form-label">Telefonszám</label>
-            <input
-              className="input-field"
-              value={module.content.phone || ''}
-              onChange={(e) => updateContent({ phone: e.target.value })}
-              placeholder="+36 30 123 4567"
-            />
-          </div>
-          <div>
-            <label className="form-label">Email</label>
-            <input
-              className="input-field"
-              type="email"
-              value={module.content.email || ''}
-              onChange={(e) => updateContent({ email: e.target.value })}
-              placeholder="email@example.com"
-            />
-          </div>
-          <div>
-            <label className="form-label">Weboldal</label>
-            <input
-              className="input-field"
-              value={module.content.website || ''}
-              onChange={(e) => updateContent({ website: e.target.value })}
-              placeholder="https://example.com"
-            />
-          </div>
-          <div>
-            <label className="form-label">Cím</label>
-            <input
-              className="input-field"
-              value={module.content.address || ''}
-              onChange={(e) => updateContent({ address: e.target.value })}
-              placeholder="Budapest, V. kerület"
-            />
+        <div style={commonStyle}>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>📞 Kapcsolat</h3>
+          <div style={{ fontSize: '12px', lineHeight: '1.6' }}>
+            {content.phone && <div>📱 {content.phone}</div>}
+            {content.email && <div>✉️ {content.email}</div>}
+            {content.address && <div>📍 {content.address}</div>}
           </div>
         </div>
       );
-    
+      
+    case 'price_list':
+      return (
+        <div style={commonStyle}>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
+            💰 {content.title || 'Árlista'}
+          </h3>
+          <div style={{ fontSize: '12px' }}>
+            {content.items?.slice(0, 2).map((item: any, i: number) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.service}
+                </span>
+                <span style={{ fontWeight: '600', marginLeft: '8px' }}>
+                  {item.price} Ft
+                </span>
+              </div>
+            ))}
+            {content.items?.length > 2 && (
+              <div style={{ fontSize: '10px', color: '#999', marginTop: '4px' }}>
+                +{content.items.length - 2} további...
+              </div>
+            )}
+          </div>
+        </div>
+      );
+      
     case 'stats':
       return (
-        <div className="space-y-4">
-          <div>
-            <label className="form-label">Statisztikák</label>
-            {module.content.stats?.map((stat: any, index: number) => (
-              <div key={index} className="border rounded-lg p-3 mb-3">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <input
-                    className="input-field"
-                    value={stat.label || ''}
-                    onChange={(e) => {
-                      const newStats = [...module.content.stats];
-                      newStats[index] = { ...stat, label: e.target.value };
-                      updateContent({ stats: newStats });
-                    }}
-                    placeholder="Címke"
-                  />
-                  <input
-                    className="input-field"
-                    value={stat.value || ''}
-                    onChange={(e) => {
-                      const newStats = [...module.content.stats];
-                      newStats[index] = { ...stat, value: e.target.value };
-                      updateContent({ stats: newStats });
-                    }}
-                    placeholder="Érték"
-                  />
-                  <input
-                    className="input-field"
-                    value={stat.icon || ''}
-                    onChange={(e) => {
-                      const newStats = [...module.content.stats];
-                      newStats[index] = { ...stat, icon: e.target.value };
-                      updateContent({ stats: newStats });
-                    }}
-                    placeholder="Emoji ikon"
-                  />
-                </div>
-                <button
-                  onClick={() => {
-                    const newStats = module.content.stats.filter((_: any, i: number) => i !== index);
-                    updateContent({ stats: newStats });
-                  }}
-                  className="btn btn-danger btn-sm mt-2"
-                >
-                  Törlés
-                </button>
+        <div style={{ ...commonStyle, display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+          {content.items?.slice(0, 3).map((stat: any, i: number) => (
+            <div key={i} style={{ textAlign: 'center', flex: 1 }}>
+              <div style={{ fontSize: '16px' }}>{stat.icon}</div>
+              <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{stat.value}</div>
+              <div style={{ fontSize: '10px', color: '#666', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {stat.label}
               </div>
-            ))}
-            <button
-              onClick={() => {
-                const newStats = [...(module.content.stats || []), { label: '', value: '', icon: '📊' }];
-                updateContent({ stats: newStats });
-              }}
-              className="btn btn-outline w-full"
-            >
-              + Új statisztika
-            </button>
-          </div>
+            </div>
+          ))}
         </div>
       );
-    
-    case 'reviews':
+
+    case 'gallery':
       return (
-        <div className="space-y-4">
-          <div>
-            <label className="form-label">Címsor</label>
-            <input
-              className="input-field"
-              value={module.content.title || ''}
-              onChange={(e) => updateContent({ title: e.target.value })}
-              placeholder="Mit mondanak rólam"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="form-label">Átlag értékelés</label>
-              <input
-                className="input-field"
-                type="number"
-                min="1"
-                max="5"
-                step="0.1"
-                value={module.content.averageRating || ''}
-                onChange={(e) => updateContent({ averageRating: parseFloat(e.target.value) })}
-                placeholder="4.8"
-              />
-            </div>
-            <div>
-              <label className="form-label">Értékelések száma</label>
-              <input
-                className="input-field"
-                type="number"
-                value={module.content.totalReviews || ''}
-                onChange={(e) => updateContent({ totalReviews: parseInt(e.target.value) })}
-                placeholder="47"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="form-label">Kiemelt értékelések</label>
-            {module.content.reviews?.map((review: any, index: number) => (
-              <div key={index} className="border rounded-lg p-3 mb-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
-                  <input
-                    className="input-field"
-                    value={review.name || ''}
-                    onChange={(e) => {
-                      const newReviews = [...module.content.reviews];
-                      newReviews[index] = { ...review, name: e.target.value };
-                      updateContent({ reviews: newReviews });
-                    }}
-                    placeholder="Ügyfél neve"
-                  />
-                  <select
-                    className="input-field"
-                    value={review.rating || 5}
-                    onChange={(e) => {
-                      const newReviews = [...module.content.reviews];
-                      newReviews[index] = { ...review, rating: parseInt(e.target.value) };
-                      updateContent({ reviews: newReviews });
-                    }}
-                  >
-                    <option value={5}>⭐⭐⭐⭐⭐ (5)</option>
-                    <option value={4}>⭐⭐⭐⭐ (4)</option>
-                    <option value={3}>⭐⭐⭐ (3)</option>
-                    <option value={2}>⭐⭐ (2)</option>
-                    <option value={1}>⭐ (1)</option>
-                  </select>
-                </div>
-                <textarea
-                  className="input-field"
-                  value={review.text || ''}
-                  onChange={(e) => {
-                    const newReviews = [...module.content.reviews];
-                    newReviews[index] = { ...review, text: e.target.value };
-                    updateContent({ reviews: newReviews });
-                  }}
-                  placeholder="Értékelés szövege"
-                  rows={2}
-                />
-                <button
-                  onClick={() => {
-                    const newReviews = module.content.reviews.filter((_: any, i: number) => i !== index);
-                    updateContent({ reviews: newReviews });
-                  }}
-                  className="btn btn-danger btn-sm mt-2"
-                >
-                  Törlés
-                </button>
-              </div>
-            ))}
-            <button
-              onClick={() => {
-                const newReviews = [...(module.content.reviews || []), { 
-                  name: '', 
-                  rating: 5, 
-                  text: '', 
-                  date: new Date().toISOString().split('T')[0] 
-                }];
-                updateContent({ reviews: newReviews });
-              }}
-              className="btn btn-outline w-full"
-            >
-              + Új értékelés
-            </button>
+        <div style={{ ...commonStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '6px' }}>
+          <div style={{ textAlign: 'center', color: '#6b7280' }}>
+            <div style={{ fontSize: '20px', marginBottom: '4px' }}>🖼️</div>
+            <div style={{ fontSize: '12px' }}>{content.title || 'Képgaléria'}</div>
           </div>
         </div>
       );
-    
+      
+    case 'video':
+      return (
+        <div style={{ ...commonStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#1f2937', borderRadius: '6px' }}>
+          <div style={{ textAlign: 'center', color: 'white' }}>
+            <div style={{ fontSize: '20px', marginBottom: '4px' }}>▶️</div>
+            <div style={{ fontSize: '12px' }}>{content.title || 'Videó'}</div>
+          </div>
+        </div>
+      );
+      
     default:
       return (
-        <div className="text-center text-gray-500 py-8">
-          <div className="text-2xl mb-2">⚙️</div>
-          <h4 className="font-medium mb-2">Modul beállítások</h4>
-          <p className="text-sm">Ez a modul típus még nem támogatja a részletes szerkesztést.</p>
-          <p className="text-xs text-gray-400 mt-2">Típus: {module.type}</p>
+        <div style={{ ...commonStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '20px', marginBottom: '4px' }}>📦</div>
+            <div style={{ fontSize: '12px' }}>Modul</div>
+          </div>
         </div>
       );
   }

@@ -1,6 +1,10 @@
+// backend/routes/profiles.js - GYORS JAVÍTÁS
+
 const express = require('express');
 const Profile = require('../models/Profile');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+// ✅ ADD HOZZÁ EZT A SORT:
+const pool = require('../config/database');
 
 const router = express.Router();
 
@@ -176,6 +180,140 @@ router.get('/:id', async (req, res) => {
   } catch (error) {
     console.error('Profile fetch error:', error);
     res.status(500).json({ error: 'Szerver hiba' });
+  }
+});
+
+// ✅ ÚJ MODULÁRIS ROUTES HOZZÁADÁSA:
+
+// Get profile modules
+router.get('/:id/modules', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(`
+      SELECT * FROM profile_modules 
+      WHERE profile_id = $1 AND is_visible = true
+      ORDER BY sort_order ASC, created_at ASC
+    `, [id]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get modules error:', error);
+    res.status(500).json({ error: 'Szerver hiba' });
+  }
+});
+
+// Create new module
+router.post('/:id/modules', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      module_type, 
+      content, 
+      position_x, 
+      position_y, 
+      width, 
+      height,
+      sort_order 
+    } = req.body;
+
+    // Check if user owns this profile
+    const profileCheck = await pool.query(
+      'SELECT user_id FROM service_profiles WHERE id = $1',
+      [id]
+    );
+
+    if (profileCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Profil nem található' });
+    }
+
+    if (profileCheck.rows[0].user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Nincs jogosultságod' });
+    }
+
+    // Create module
+    const result = await pool.query(`
+      INSERT INTO profile_modules 
+      (profile_id, module_type, content, position_x, position_y, width, height, sort_order)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *
+    `, [
+      id, 
+      module_type, 
+      JSON.stringify(content), 
+      position_x || 0, 
+      position_y || 0, 
+      width || 1, 
+      height || 1, 
+      sort_order || 0
+    ]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Create module error:', error);
+    res.status(500).json({ error: 'Szerver hiba: ' + error.message });
+  }
+});
+
+// Update module
+router.put('/:id/modules/:moduleId', authenticateToken, async (req, res) => {
+  try {
+    const { id, moduleId } = req.params;
+    const updates = req.body;
+
+    // Check ownership
+    const ownershipCheck = await pool.query(`
+      SELECT sp.user_id 
+      FROM profile_modules pm
+      JOIN service_profiles sp ON pm.profile_id = sp.id
+      WHERE pm.uuid = $1 AND sp.id = $2
+    `, [moduleId, id]);
+
+    if (ownershipCheck.rows.length === 0 || ownershipCheck.rows[0].user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Nincs jogosultságod' });
+    }
+
+    // Update content field specifically
+    if (updates.content) {
+      const result = await pool.query(`
+        UPDATE profile_modules 
+        SET content = $1, updated_at = CURRENT_TIMESTAMP
+        WHERE uuid = $2 AND profile_id = $3
+        RETURNING *
+      `, [JSON.stringify(updates.content), moduleId, id]);
+
+      res.json(result.rows[0]);
+    } else {
+      res.status(400).json({ error: 'Nincs frissítendő tartalom' });
+    }
+  } catch (error) {
+    console.error('Update module error:', error);
+    res.status(500).json({ error: 'Szerver hiba: ' + error.message });
+  }
+});
+
+// Delete module
+router.delete('/:id/modules/:moduleId', authenticateToken, async (req, res) => {
+  try {
+    const { id, moduleId } = req.params;
+
+    // Check ownership
+    const ownershipCheck = await pool.query(`
+      SELECT sp.user_id 
+      FROM profile_modules pm
+      JOIN service_profiles sp ON pm.profile_id = sp.id
+      WHERE pm.uuid = $1 AND sp.id = $2
+    `, [moduleId, id]);
+
+    if (ownershipCheck.rows.length === 0 || ownershipCheck.rows[0].user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Nincs jogosultságod' });
+    }
+
+    await pool.query('DELETE FROM profile_modules WHERE uuid = $1', [moduleId]);
+    res.status(204).send();
+  } catch (error) {
+    console.error('Delete module error:', error);
+    res.status(500).json({ error: 'Szerver hiba: ' + error.message });
   }
 });
 

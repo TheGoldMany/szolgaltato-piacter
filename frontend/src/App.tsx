@@ -6,10 +6,12 @@ import RegisterForm from './components/auth/RegisterForm';
 import Dashboard from './pages/Dashboard';
 import HomePage from './pages/HomePage';
 import Navbar from './components/layout/Navbar';
-import ProfileEditor from './components/profile/ProfileEditor';
-import ModularProfileEditor from './components/profile/ModularProfileEditor'; // ÚJ IMPORT
+import ProfileEditor from './components/profile/ProfileEditor'; 
 import { ProfileView } from './components/profile';
 import ServiceProviders from './pages/ServiceProviders';
+
+// ✅ JAVÍTOTT IMPORT PATH:
+import ModularProfileEditor from './components/profile/ModularProfileEditor';
 import './App.css';
 
 // Protected Route component
@@ -48,9 +50,12 @@ const App: React.FC = () => {
       <Router>
         <div className="App">
           <Routes>
+            {/* ✅ TISZTÍTOTT ROUTES - Duplikátumok eltávolítva */}
+            
             {/* Public Routes */}
             <Route path="/" element={<HomePage />} />
             <Route path="/services" element={<ServiceProviders />} />
+            <Route path="/browse" element={<ServiceProviders />} />
             <Route path="/profile/:id" element={<ProfileView />} />
             
             {/* Auth Routes */}
@@ -89,7 +94,7 @@ const App: React.FC = () => {
               } 
             />
             
-            {/* ÚJ: Moduláris Profil Szerkesztő */}
+            {/* ✅ EGYETLEN Moduláris Profil Szerkesztő Route */}
             <Route 
               path="/profile/modular-editor" 
               element={
