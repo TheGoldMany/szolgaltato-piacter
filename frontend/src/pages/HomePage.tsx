@@ -1,104 +1,21 @@
+// frontend/src/pages/HomePage.tsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import Navbar from '../components/layout/Navbar';
 
-// Navbar komponens
-const Navbar = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  const navLinks = [
-    { href: '/', label: 'Főoldal', icon: '🏠' },
-    { href: '/services', label: 'Szolgáltatók', icon: '🔍' },
-    { href: '/categories', label: 'Kategóriák', icon: '📋' },
-    { href: '/how-it-works', label: 'Hogyan működik', icon: '❓' },
-  ];
-
-  return (
-    <nav className="navbar-fixed">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          
-          {/* Logo */}
-          <div className="flex items-center">
-            <a href="/" className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-lg">🎯</span>
-              </div>
-              <span className="logo-text">
-                Corvus
-              </span>
-            </a>
-          </div>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-1">
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="nav-link"
-              >
-                <span>{link.icon}</span>
-                <span>{link.label}</span>
-              </a>
-            ))}
-          </div>
-
-          {/* Right Side - Auth Buttons */}
-          <div className="flex items-center space-x-4">
-            <div className="hidden sm:flex items-center space-x-3">
-              <a href="/login" className="px-4 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
-                Bejelentkezés
-              </a>
-              <a href="/register" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                Regisztráció
-              </a>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="mobile-menu md:hidden py-4">
-            <div className="space-y-2 px-4">
-              {navLinks.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  className="flex items-center space-x-3 py-3 text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-lg px-3 transition-colors"
-                >
-                  <span>{link.icon}</span>
-                  <span>{link.label}</span>
-                </a>
-              ))}
-              
-              <div className="pt-4 border-t border-gray-200 space-y-2">
-                <a href="/login" className="block w-full px-4 py-2 text-center text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
-                  Bejelentkezés
-                </a>
-                <a href="/register" className="block w-full px-4 py-2 text-center bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                  Regisztráció
-                </a>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </nav>
-  );
-};
-
-// HomePage komponens
 const HomePage: React.FC = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+
+  const handleGetStarted = () => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    } else {
+      navigate('/register');
+    }
+  };
 
   const categories = [
     { id: 'epites-felujitas', name: 'Építés & Felújítás', icon: '🏗️', count: 234 },
@@ -164,8 +81,9 @@ const HomePage: React.FC = () => {
   ];
 
   return (
+    // FONTOS: navbar-padding osztály hozzáadva a container div-hez
     <div className="min-h-screen bg-gray-50 navbar-padding">
-      {/* Navigation */}
+      {/* Navigation - Az új Navbar komponenst használjuk */}
       <Navbar />
 
       {/* AI Chat Hero Section */}
@@ -190,7 +108,10 @@ const HomePage: React.FC = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full px-6 py-4 text-lg rounded-2xl border-0 focus:outline-none focus:ring-4 focus:ring-white/30 shadow-xl text-gray-900"
                 />
-                <button className="absolute right-2 top-2 p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors">
+                <button 
+                  onClick={() => navigate('/ai-chat')}
+                  className="absolute right-2 top-2 p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+                >
                   🚀
                 </button>
               </div>
@@ -201,7 +122,10 @@ const HomePage: React.FC = () => {
               {exampleQuestions.map((question, index) => (
                 <button
                   key={index}
-                  onClick={() => setSearchQuery(question)}
+                  onClick={() => {
+                    setSearchQuery(question);
+                    navigate('/ai-chat');
+                  }}
                   className="px-4 py-2 bg-white/20 backdrop-blur-sm text-white rounded-full hover:bg-white/30 transition-colors text-sm"
                 >
                   {question}
@@ -228,6 +152,7 @@ const HomePage: React.FC = () => {
             {trendingSearches.map((item, index) => (
               <div
                 key={index}
+                onClick={() => navigate('/services')}
                 className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-6 hover:shadow-lg transition-all duration-300 cursor-pointer border hover:border-blue-300 group"
               >
                 <div className="flex items-center justify-between">
@@ -262,7 +187,8 @@ const HomePage: React.FC = () => {
             {featuredProviders.map((provider, index) => (
               <div
                 key={index}
-                className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border hover:border-blue-300 group"
+                onClick={() => navigate('/services')}
+                className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border hover:border-blue-300 group cursor-pointer"
               >
                 <div className="text-center">
                   <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{provider.image}</div>
@@ -296,7 +222,10 @@ const HomePage: React.FC = () => {
           </div>
           
           <div className="text-center mt-8">
-            <button className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <button 
+              onClick={() => navigate('/services')}
+              className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
               Összes szakember megtekintése
             </button>
           </div>
@@ -319,6 +248,7 @@ const HomePage: React.FC = () => {
             {categories.map((category, index) => (
               <div
                 key={index}
+                onClick={() => navigate('/categories')}
                 className="bg-white rounded-xl p-6 text-center hover:shadow-lg transition-all duration-300 cursor-pointer border-2 border-gray-100 hover:border-blue-300 group"
               >
                 <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">{category.icon}</div>
@@ -407,10 +337,16 @@ const HomePage: React.FC = () => {
             Csatlakozz több ezer elégedett felhasználónkhoz
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-lg font-semibold">
+            <button 
+              onClick={() => navigate('/register')}
+              className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-lg font-semibold"
+            >
               Regisztráció szakemberként 🚀
             </button>
-            <button className="px-8 py-4 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors text-lg font-semibold">
+            <button 
+              onClick={() => navigate('/services')}
+              className="px-8 py-4 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors text-lg font-semibold"
+            >
               Szolgáltatók böngészése
             </button>
           </div>

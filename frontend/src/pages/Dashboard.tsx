@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import Navbar from '../components/layout/Navbar';
+import { useNavigate } from 'react-router-dom';
+
 
 // Mock Auth Context (helyettesíti a useAuth-ot)
 const useAuth = () => {
@@ -12,136 +15,12 @@ const useAuth = () => {
   };
 };
 
-// Navbar komponens (ugyanaz mint HomePage-ben)
-const Navbar = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user } = useAuth();
-
-  const navLinks = [
-    { href: '/', label: 'Főoldal', icon: '🏠' },
-    { href: '/services', label: 'Szolgáltatók', icon: '🔍' },
-    { href: '/categories', label: 'Kategóriák', icon: '📋' },
-    { href: '/how-it-works', label: 'Hogyan működik', icon: '❓' },
-  ];
-
-  const userMenuItems = user ? [
-    { href: '/dashboard', label: 'Dashboard', icon: '📊' },
-    { href: '/profile/edit', label: 'Profil szerkesztése', icon: '👤' },
-    { href: '/profile/modular-editor', label: 'Moduláris szerkesztő', icon: '🎨', highlight: true },
-    { href: '/messages', label: 'Üzenetek', icon: '💬' },
-    { href: '/orders', label: 'Megrendelések', icon: '📦' },
-    { href: '/settings', label: 'Beállítások', icon: '⚙️' },
-    { href: '/logout', label: 'Kijelentkezés', icon: '🚪' },
-  ] : [];
-
-  return (
-    <nav className="navbar-fixed">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          
-          {/* Logo */}
-          <div className="flex items-center">
-            <a href="/" className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-lg">🎯</span>
-              </div>
-              <span className="logo-text">
-                Corvus
-              </span>
-            </a>
-          </div>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-1">
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="nav-link"
-              >
-                <span>{link.icon}</span>
-                <span>{link.label}</span>
-              </a>
-            ))}
-          </div>
-
-          {/* Right Side - User Menu */}
-          <div className="flex items-center space-x-4">
-            {user && (
-              <div className="hidden sm:flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-bold">
-                    {user.firstName[0]}{user.lastName[0]}
-                  </span>
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-medium text-gray-700">{user.firstName} {user.lastName}</p>
-                  <p className="text-xs text-gray-500">
-                    {user.userType === 'service_provider' ? 'Szolgáltató' : 'Ügyfél'}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="mobile-menu md:hidden py-4">
-            <div className="space-y-2 px-4">
-              {navLinks.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  className="flex items-center space-x-3 py-3 text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-lg px-3 transition-colors"
-                >
-                  <span>{link.icon}</span>
-                  <span>{link.label}</span>
-                </a>
-              ))}
-              
-              {userMenuItems.map((item) => (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center space-x-3 py-3 px-3 rounded-lg transition-colors ${
-                    item.highlight 
-                      ? 'text-blue-600 bg-blue-50 font-medium' 
-                      : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
-                  }`}
-                >
-                  <span>{item.icon}</span>
-                  <span>{item.label}</span>
-                  {item.highlight && (
-                    <span className="ml-auto text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                      ÚJ
-                    </span>
-                  )}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </nav>
-  );
-};
-
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50 navbar-padding">
+      {/* Navigation - Az új Navbar komponenst használjuk */}
       <Navbar />
 
       {/* Welcome Header */}

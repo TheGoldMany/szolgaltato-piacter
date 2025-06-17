@@ -10,6 +10,8 @@ import { ProfileView } from './components/profile';
 import ServiceProviders from './pages/ServiceProviders';
 import ModularProfileEditor from './components/profile/ModularProfileEditor';
 import './App.css';
+import HowItWorksPage from './pages/HowItWorksPage';
+import AIChatPage from './pages/AIChatPage';
 
 // Protected Route component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -88,7 +90,19 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               } 
             />
-            
+           
+            <Route path="/ai-chat" element={<AIChatPage />} />
+
+             {/* AI Chat with Authentication (for conversation history) */}
+            <Route 
+              path="/ai-chat/history" 
+              element={
+                <ProtectedRoute>
+                  <AIChatPage showHistory={true} />
+                </ProtectedRoute>
+              } 
+            />
+            <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route 
               path="/profile/modular-editor" 
               element={
