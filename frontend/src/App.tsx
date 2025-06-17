@@ -9,6 +9,7 @@ import ProfileEditor from './components/profile/ProfileEditor';
 import { ProfileView } from './components/profile';
 import ServiceProviders from './pages/ServiceProviders';
 import ModularProfileEditor from './components/profile/ModularProfileEditor';
+import ProjectManager from './pages/ProjectManager';
 import './App.css';
 import HowItWorksPage from './pages/HowItWorksPage';
 import AIChatPage from './pages/AIChatPage';
@@ -54,6 +55,18 @@ const App: React.FC = () => {
             <Route path="/services" element={<ServiceProviders />} />
             <Route path="/browse" element={<ServiceProviders />} />
             <Route path="/profile/:id" element={<ProfileView />} />
+            <Route path="/how-it-works" element={<HowItWorksPage />} />
+            
+            {/* AI Chat Routes */}
+            <Route path="/ai-chat" element={<AIChatPage />} />
+            <Route 
+              path="/ai-chat/history" 
+              element={
+                <ProtectedRoute>
+                  <AIChatPage showHistory={true} />
+                </ProtectedRoute>
+              } 
+            />
             
             {/* Auth Routes */}
             <Route 
@@ -82,6 +95,8 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               } 
             />
+            
+            {/* Profile Management Routes */}
             <Route 
               path="/profile/edit" 
               element={
@@ -90,24 +105,61 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               } 
             />
-           
-            <Route path="/ai-chat" element={<AIChatPage />} />
-
-             {/* AI Chat with Authentication (for conversation history) */}
-            <Route 
-              path="/ai-chat/history" 
-              element={
-                <ProtectedRoute>
-                  <AIChatPage showHistory={true} />
-                </ProtectedRoute>
-              } 
-            />
-            <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route 
               path="/profile/modular-editor" 
               element={
                 <ProtectedRoute>
                   <ModularProfileEditor />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Project Management Routes */}
+            <Route 
+              path="/projects" 
+              element={
+                <ProtectedRoute>
+                  <ProjectManager />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/projects/my" 
+              element={
+                <ProtectedRoute>
+                  <ProjectManager />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/projects/create" 
+              element={
+                <ProtectedRoute>
+                  <ProjectManager />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/projects/:id" 
+              element={
+                <ProtectedRoute>
+                  <ProjectManager />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/projects/:id/workspace" 
+              element={
+                <ProtectedRoute>
+                  <ProjectManager />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/projects/:id/settings" 
+              element={
+                <ProtectedRoute>
+                  <ProjectManager />
                 </ProtectedRoute>
               } 
             />

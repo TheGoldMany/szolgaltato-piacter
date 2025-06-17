@@ -1,16 +1,70 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/layout/Navbar';
 
-const ProjectManagementSystem = () => {
-  const [currentView, setCurrentView] = useState('my-projects');
-  const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [user] = useState({ id: 1, name: 'Kovács Péter', type: 'client' });
+// TypeScript interfaces
+interface Participant {
+  id: number;
+  name: string;
+  role: string;
+  avatar: string;
+  status: 'accepted' | 'invited' | 'completed';
+}
+
+interface Project {
+  id: number;
+  title: string;
+  description: string;
+  status: 'planning' | 'active' | 'completed' | 'cancelled';
+  budget_min: number;
+  budget_max: number;
+  location_city: string;
+  location_address: string;
+  start_date: string;
+  end_date: string;
+  progress: number;
+  participants: Participant[];
+  created_at: string;
+  required_skills?: string[];
+}
+
+interface NewProject {
+  title: string;
+  description: string;
+  location_city: string;
+  location_address: string;
+  budget_min: string | number;
+  budget_max: string | number;
+  start_date: string;
+  end_date: string;
+  required_skills: string[];
+}
+
+interface User {
+  id: number;
+  name: string;
+  type: 'client' | 'provider' | 'admin';
+}
+
+interface Provider {
+  id: number;
+  name: string;
+  role: string;
+  rating: number;
+  reviews: number;
+  verified: boolean;
+  corvus: boolean;
+}
+
+const ProjectManagementSystem: React.FC = () => {
+  const [currentView, setCurrentView] = useState<'my-projects' | 'create-project' | 'workspace' | 'invite-provider' | 'project-settings'>('my-projects');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [user] = useState<User>({ id: 1, name: 'Kovács Péter', type: 'client' });
 
   // Mock API hívások
-  const mockProjects = [
+  const mockProjects: Project[] = [
     {
       id: 1,
       title: 'Konyha Felújítás',
@@ -74,7 +128,7 @@ const ProjectManagementSystem = () => {
     }, 500);
   }, []);
 
-  const [newProject, setNewProject] = useState({
+  const [newProject, setNewProject] = useState<NewProject>({
     title: '',
     description: '',
     location_city: '',
@@ -86,16 +140,16 @@ const ProjectManagementSystem = () => {
     required_skills: []
   });
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedProject, setSelectedProject] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  const cities = ['Budapest', 'Debrecen', 'Szeged', 'Miskolc', 'Pécs', 'Győr', 'Nyíregyháza', 'Kecskemét'];
-  const skillCategories = [
+  const cities: string[] = ['Budapest', 'Debrecen', 'Szeged', 'Miskolc', 'Pécs', 'Győr', 'Nyíregyháza', 'Kecskemét'];
+  const skillCategories: string[] = [
     'Építés és Felújítás', 'Kert és Külső Területek', 'Takarítás és Háztartás',
     'IT és Technológia', 'Üzleti Szolgáltatások', 'Oktatás és Képzés'
   ];
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: Project['status']): string => {
     switch (status) {
       case 'planning': return 'bg-blue-100 text-blue-800';
       case 'active': return 'bg-green-100 text-green-800';
@@ -105,7 +159,7 @@ const ProjectManagementSystem = () => {
     }
   };
 
-  const getStatusText = (status) => {
+  const getStatusText = (status: Project['status']): string => {
     switch (status) {
       case 'planning': return 'Tervezés';
       case 'active': return 'Aktív';
@@ -115,15 +169,15 @@ const ProjectManagementSystem = () => {
     }
   };
 
-  const formatBudget = (min, max) => {
+  const formatBudget = (min: number, max: number): string => {
     return `${min?.toLocaleString()} - ${max?.toLocaleString()} Ft`;
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('hu-HU');
   };
 
-  const createProject = async () => {
+  const createProject = async (): Promise<void> => {
     if (!newProject.title || !newProject.description) {
       alert('Kérjük töltse ki a kötelező mezőket!');
       return;
@@ -133,17 +187,17 @@ const ProjectManagementSystem = () => {
     
     // Mock API hívás
     setTimeout(() => {
-      const projectToAdd = {
+      const projectToAdd: Project = {
         ...newProject,
         id: projects.length + 1,
         status: 'planning',
         progress: 0,
         participants: [],
         created_at: new Date().toISOString(),
-        budget_min: parseInt(newProject.budget_min) || 0,
-        budget_max: parseInt(newProject.budget_max) || 0,
+        budget_min: parseInt(newProject.budget_min.toString()) || 0,
+        budget_max: parseInt(newProject.budget_max.toString()) || 0,
       };
-      
+
       setProjects([projectToAdd, ...projects]);
       setNewProject({
         title: '',
@@ -162,18 +216,18 @@ const ProjectManagementSystem = () => {
     }, 1000);
   };
 
-  const openProjectWorkspace = (project) => {
+  const openProjectWorkspace = (project: Project): void => {
     setSelectedProject(project);
     setCurrentView('workspace');
   };
 
-  const inviteProvider = (projectId, providerId) => {
+  const inviteProvider = (projectId: number, providerId: number): void => {
     // Mock API hívás szolgáltató meghívásához
     console.log(`Inviting provider ${providerId} to project ${projectId}`);
   };
 
   // Projekt Workspace komponens (egyszerűsített verzió)
-  const ProjectWorkspace = ({ project }) => (
+  const ProjectWorkspace: React.FC<{ project: Project }> = ({ project }) => (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6">
         <div className="flex justify-between items-center">
@@ -225,7 +279,7 @@ const ProjectManagementSystem = () => {
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <h3 className="text-lg font-semibold mb-4">👥 Csapat Tagok</h3>
             <div className="space-y-3">
-              {project.participants.map(participant => (
+              {project.participants.map((participant: Participant) => (
                 <div key={participant.id} className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
                     {participant.avatar}
@@ -286,6 +340,9 @@ const ProjectManagementSystem = () => {
   }
 
   return (
+    <div className="min-h-screen bg-gray-50 navbar-padding">
+      {/* Navigation - Az új Navbar komponenst használjuk */}
+      <Navbar />
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
@@ -396,7 +453,7 @@ const ProjectManagementSystem = () => {
 
             {/* Projektek listája */}
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {projects.map(project => (
+              {projects.map((project: Project) => (
                 <div key={project.id} className="bg-white rounded-xl shadow-sm border hover:shadow-md transition-shadow">
                   <div className="p-6">
                     <div className="flex justify-between items-start mb-4">
@@ -445,7 +502,7 @@ const ProjectManagementSystem = () => {
                     <div className="flex items-center gap-2 mb-4">
                       <span className="text-sm text-gray-500">Csapat:</span>
                       <div className="flex -space-x-2">
-                        {project.participants.slice(0, 3).map(participant => (
+                        {project.participants.slice(0, 3).map((participant: Participant) => (
                           <div 
                             key={participant.id}
                             className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-semibold border-2 border-white"
@@ -847,12 +904,12 @@ const ProjectManagementSystem = () => {
 
               {/* Provider Results */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {[
+                {([
                   { id: 1, name: 'Szabó János', role: 'Villanyszerelő', rating: 4.8, reviews: 127, verified: true, corvus: false },
                   { id: 2, name: 'Nagy István', role: 'Kőműves', rating: 4.9, reviews: 89, verified: true, corvus: true },
                   { id: 3, name: 'Tóth Mária', role: 'Burkoló', rating: 4.7, reviews: 56, verified: false, corvus: false },
                   { id: 4, name: 'Kiss Anna', role: 'Frontend Developer', rating: 4.6, reviews: 34, verified: true, corvus: true }
-                ].map(provider => (
+                ] as Provider[]).map(provider => (
                   <div key={provider.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-start gap-3">
                       <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
@@ -882,7 +939,7 @@ const ProjectManagementSystem = () => {
                       </div>
                       <div className="flex flex-col gap-2">
                         <button 
-                          onClick={() => inviteProvider(selectedProject?.id, provider.id)}
+                          onClick={() => inviteProvider(selectedProject?.id || 0, provider.id)}
                           className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
                         >
                           Meghívás
@@ -1024,13 +1081,70 @@ const ProjectManagementSystem = () => {
         </div>
       </div>
     </div>
+    {/* Footer */}
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div>
+              <div className="text-2xl font-bold mb-4">🚀 Corvus Platform</div>
+              <p className="text-gray-400">
+                Találd meg a tökéletes szakembert minden igényedre.
+              </p>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Platform</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="/services" className="hover:text-white transition-colors">Szolgáltatók böngészése</a></li>
+                <li><a href="/register" className="hover:text-white transition-colors">Regisztráció</a></li>
+                <li><a href="/education" className="hover:text-white transition-colors">Corvus Tanulás</a></li>
+                <li><a href="/projects" className="hover:text-white transition-colors">Projektek</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Támogatás</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="/help" className="hover:text-white transition-colors">Súgó központ</a></li>
+                <li><a href="/contact" className="hover:text-white transition-colors">Kapcsolat</a></li>
+                <li><a href="/faq" className="hover:text-white transition-colors">GYIK</a></li>
+                <li><a href="/guidelines" className="hover:text-white transition-colors">Irányelvek</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Kapcsolat</h4>
+              <div className="space-y-2 text-gray-400">
+                <p>📧 info@corvus-platform.hu</p>
+                <p>📞 +36 1 234 5678</p>
+                <p>📍 Budapest, Magyarország</p>
+              </div>
+            </div>
+          </div>
+          
+          <hr className="border-gray-700 my-8" />
+          
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <p className="text-gray-400">
+              © 2025 Corvus Platform Kft. Minden jog fenntartva.
+            </p>
+            <div className="flex space-x-6 mt-4 md:mt-0">
+              <a href="/privacy" className="text-gray-400 hover:text-white transition-colors">Adatvédelem</a>
+              <a href="/terms" className="text-gray-400 hover:text-white transition-colors">ÁSZF</a>
+              <a href="/cookies" className="text-gray-400 hover:text-white transition-colors">Sütik</a>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
   );
 };
 
 // Database Integration Helper Functions
 const ProjectAPI = {
   // Projektek lekérése
-  async getProjects(userId) {
+  async getProjects(userId: number): Promise<Project[]> {
     try {
       const response = await fetch(`/api/projects?user_id=${userId}`, {
         headers: {
@@ -1045,7 +1159,7 @@ const ProjectAPI = {
   },
 
   // Új projekt létrehozása
-  async createProject(projectData) {
+  async createProject(projectData: Partial<Project>): Promise<Project> {
     try {
       const response = await fetch('/api/projects', {
         method: 'POST',
@@ -1063,7 +1177,7 @@ const ProjectAPI = {
   },
 
   // Projekt frissítése
-  async updateProject(projectId, updates) {
+  async updateProject(projectId: number, updates: Partial<Project>): Promise<Project> {
     try {
       const response = await fetch(`/api/projects/${projectId}`, {
         method: 'PUT',
@@ -1081,7 +1195,7 @@ const ProjectAPI = {
   },
 
   // Szolgáltató meghívása projekthez
-  async inviteProvider(projectId, providerId, role) {
+  async inviteProvider(projectId: number, providerId: number, role: string): Promise<any> {
     try {
       const response = await fetch('/api/project-participants', {
         method: 'POST',
