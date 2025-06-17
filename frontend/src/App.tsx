@@ -1,3 +1,4 @@
+// frontend/src/App.tsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -10,6 +11,8 @@ import { ProfileView } from './components/profile';
 import ServiceProviders from './pages/ServiceProviders';
 import ModularProfileEditor from './components/profile/ModularProfileEditor';
 import ProjectManager from './pages/ProjectManager';
+import CoursesPage from './pages/CoursesPage';
+import CourseDetailPage from './pages/CourseDetailPage';
 import './App.css';
 import HowItWorksPage from './pages/HowItWorksPage';
 import AIChatPage from './pages/AIChatPage';
@@ -57,6 +60,11 @@ const App: React.FC = () => {
             <Route path="/profile/:id" element={<ProfileView />} />
             <Route path="/how-it-works" element={<HowItWorksPage />} />
             
+            {/* Courses Routes */}
+            <Route path="/courses" element={<CoursesPage />} />
+            <Route path="/courses/:id" element={<CourseDetailPage />} />
+            <Route path="/categories" element={<CoursesPage />} />
+            
             {/* AI Chat Routes */}
             <Route path="/ai-chat" element={<AIChatPage />} />
             <Route 
@@ -95,8 +103,8 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               } 
             />
-            
-            {/* Profile Management Routes */}
+
+            {/* Profile Routes */}
             <Route 
               path="/profile/edit" 
               element={
@@ -114,7 +122,24 @@ const App: React.FC = () => {
               } 
             />
 
-            {/* Project Management Routes */}
+            {/* Messages Route */}
+            <Route 
+              path="/messages" 
+              element={
+                <ProtectedRoute>
+                  <div className="min-h-screen bg-gray-50 navbar-padding">
+                    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                      <div className="text-center">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4">💬 Üzenetek</h1>
+                        <p className="text-gray-600">Az üzenetküldő funkció hamarosan elérhető lesz.</p>
+                      </div>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Projects Route */}
             <Route 
               path="/projects" 
               element={
@@ -124,39 +149,7 @@ const App: React.FC = () => {
               } 
             />
             <Route 
-              path="/projects/my" 
-              element={
-                <ProtectedRoute>
-                  <ProjectManager />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/projects/create" 
-              element={
-                <ProtectedRoute>
-                  <ProjectManager />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/projects/:id" 
-              element={
-                <ProtectedRoute>
-                  <ProjectManager />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/projects/:id/workspace" 
-              element={
-                <ProtectedRoute>
-                  <ProjectManager />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/projects/:id/settings" 
+              path="/workspace" 
               element={
                 <ProtectedRoute>
                   <ProjectManager />
@@ -164,8 +157,123 @@ const App: React.FC = () => {
               } 
             />
 
-            {/* Catch all route */}
-            <Route path="*" element={<Navigate to="/" />} />
+            {/* Course Learning Routes - Protected */}
+            <Route 
+              path="/courses/:id/learn" 
+              element={
+                <ProtectedRoute>
+                  <div className="min-h-screen bg-gray-50 navbar-padding">
+                    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                      <div className="text-center">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4">📚 Kurzus Tanulás</h1>
+                        <p className="text-gray-600">A tanulási felület hamarosan elérhető lesz.</p>
+                      </div>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* User Course Management - Protected */}
+            <Route 
+              path="/my-courses" 
+              element={
+                <ProtectedRoute>
+                  <div className="min-h-screen bg-gray-50 navbar-padding">
+                    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                      <div className="text-center">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4">📖 Kurzusaim</h1>
+                        <p className="text-gray-600">A kurzusok kezelése hamarosan elérhető lesz.</p>
+                      </div>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/my-certificates" 
+              element={
+                <ProtectedRoute>
+                  <div className="min-h-screen bg-gray-50 navbar-padding">
+                    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                      <div className="text-center">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4">🏆 Tanúsítványaim</h1>
+                        <p className="text-gray-600">A tanúsítványok megtekintése hamarosan elérhető lesz.</p>
+                      </div>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Additional Protected Routes */}
+            <Route 
+              path="/orders" 
+              element={
+                <ProtectedRoute>
+                  <div className="min-h-screen bg-gray-50 navbar-padding">
+                    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                      <div className="text-center">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4">📦 Megrendelések</h1>
+                        <p className="text-gray-600">A megrendelések kezelése hamarosan elérhető lesz.</p>
+                      </div>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/bookings" 
+              element={
+                <ProtectedRoute>
+                  <div className="min-h-screen bg-gray-50 navbar-padding">
+                    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                      <div className="text-center">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4">📅 Foglalásaim</h1>
+                        <p className="text-gray-600">A foglalások kezelése hamarosan elérhető lesz.</p>
+                      </div>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/favorites" 
+              element={
+                <ProtectedRoute>
+                  <div className="min-h-screen bg-gray-50 navbar-padding">
+                    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                      <div className="text-center">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4">❤️ Kedvencek</h1>
+                        <p className="text-gray-600">A kedvencek kezelése hamarosan elérhető lesz.</p>
+                      </div>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/settings" 
+              element={
+                <ProtectedRoute>
+                  <div className="min-h-screen bg-gray-50 navbar-padding">
+                    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                      <div className="text-center">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4">⚙️ Beállítások</h1>
+                        <p className="text-gray-600">A beállítások hamarosan elérhetőek lesznek.</p>
+                      </div>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Catch-all Route */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </Router>
