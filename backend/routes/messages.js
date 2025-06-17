@@ -1,56 +1,36 @@
+// backend/routes/messages.js - VÉGLEGES JAVÍTOTT VERZIÓ
 const express = require('express');
-const messagesRouter = express.Router();
+const { authenticateToken } = require('../middleware/auth');
+const pool = require('../config/database');
 
-// Get conversations for user
-messagesRouter.get('/conversations', authenticateToken, async (req, res) => {
+const router = express.Router();
+
+// Get all conversations for current user
+router.get('/conversations', authenticateToken, async (req, res) => {
   try {
     const { id: userId } = req.user;
 
     const result = await pool.query(`
-      SELECT DISTINCT ON (
+      SELECT DISTINCT
         CASE 
           WHEN m.sender_id = $1 THEN m.receiver_id 
           ELSE m.sender_id 
-        END
-      )
-        CASE 
-          WHEN m.sender_id = $1 THEN m.receiver_id 
-          ELSE m.sender_id 
-        END as participant_id,
+        END as other_user_id,
         u.first_name,
         u.last_name,
         sp.business_name,
         sp.profile_image_url,
-        m.content as last_message,
-        m.created_at as last_message_at,
-        m.is_read,
-        m.sender_id = $1 as sent_by_me,
-        (SELECT COUNT(*) 
-         FROM messages m2 
-         WHERE m2.receiver_id = $1 
-         AND m2.sender_id = (
-           CASE 
-             WHEN m.sender_id = $1 THEN m.receiver_id 
-             ELSE m.sender_id 
-           END
-         )
-         AND m2.is_read = false
-        ) as unread_count
+        MAX(m.created_at) as last_message_time,
+        COUNT(CASE WHEN m.receiver_id = $1 AND m.is_read = false THEN 1 END) as unread_count
       FROM messages m
-      JOIN users u ON (
-        CASE 
-          WHEN m.sender_id = $1 THEN m.receiver_id = u.id
-          ELSE m.sender_id = u.id
-        END
-      )
+      JOIN users u ON u.id = CASE 
+        WHEN m.sender_id = $1 THEN m.receiver_id 
+        ELSE m.sender_id 
+      END
       LEFT JOIN service_profiles sp ON u.id = sp.user_id
       WHERE m.sender_id = $1 OR m.receiver_id = $1
-      ORDER BY (
-        CASE 
-          WHEN m.sender_id = $1 THEN m.receiver_id 
-          ELSE m.sender_id 
-        END
-      ), m.created_at DESC
+      GROUP BY other_user_id, u.first_name, u.last_name, sp.business_name, sp.profile_image_url
+      ORDER BY last_message_time DESC
     `, [userId]);
 
     res.json({
@@ -66,53 +46,48 @@ messagesRouter.get('/conversations', authenticateToken, async (req, res) => {
   }
 });
 
-// Get messages between two users
-messagesRouter.get('/conversation/:participantId', authenticateToken, async (req, res) => {
+// Get messages with specific user
+router.get('/conversation/:userId', authenticateToken, async (req, res) => {
   try {
-    const { id: userId } = req.user;
-    const { participantId } = req.params;
+    const { userId: otherUserId } = req.params;
+    const { id: currentUserId } = req.user;
 
     const result = await pool.query(`
-      SELECT 
-        m.id,
-        m.uuid,
-        m.content,
-        m.message_type,
-        m.sender_id,
-        m.receiver_id,
-        m.is_read,
-        m.created_at,
-        u.first_name as sender_first_name,
-        u.last_name as sender_last_name
+      SELECT m.*, 
+        sender.first_name as sender_first_name,
+        sender.last_name as sender_last_name,
+        receiver.first_name as receiver_first_name,
+        receiver.last_name as receiver_last_name
       FROM messages m
-      JOIN users u ON m.sender_id = u.id
+      JOIN users sender ON m.sender_id = sender.id
+      JOIN users receiver ON m.receiver_id = receiver.id
       WHERE (m.sender_id = $1 AND m.receiver_id = $2)
          OR (m.sender_id = $2 AND m.receiver_id = $1)
       ORDER BY m.created_at ASC
-    `, [userId, participantId]);
+    `, [currentUserId, otherUserId]);
 
     // Mark messages as read
     await pool.query(`
       UPDATE messages 
       SET is_read = true 
       WHERE sender_id = $1 AND receiver_id = $2 AND is_read = false
-    `, [participantId, userId]);
+    `, [otherUserId, currentUserId]);
 
     res.json({
       success: true,
       data: result.rows
     });
   } catch (error) {
-    console.error('Error fetching messages:', error);
+    console.error('Error fetching conversation:', error);
     res.status(500).json({
       success: false,
-      error: 'Hiba az üzenetek betöltése során'
+      error: 'Hiba a beszélgetés betöltése során'
     });
   }
 });
 
-// Send message
-messagesRouter.post('/send', authenticateToken, async (req, res) => {
+// Send new message
+router.post('/send', authenticateToken, async (req, res) => {
   try {
     const { id: senderId } = req.user;
     const { receiverId, content, messageType = 'text', projectId } = req.body;
@@ -145,9 +120,9 @@ messagesRouter.post('/send', authenticateToken, async (req, res) => {
 });
 
 // Mark message as read
-messagesRouter.put('/:id/read', authenticateToken, async (req, res) => {
+router.put('/:messageId/read', authenticateToken, async (req, res) => {
   try {
-    const { id: messageId } = req.params;
+    const { messageId } = req.params;
     const { id: userId } = req.user;
 
     const result = await pool.query(`
@@ -177,4 +152,32 @@ messagesRouter.put('/:id/read', authenticateToken, async (req, res) => {
   }
 });
 
-module.exports = { router, messagesRouter };
+// Get message statistics
+router.get('/stats', authenticateToken, async (req, res) => {
+  try {
+    const { id: userId } = req.user;
+
+    const result = await pool.query(`
+      SELECT 
+        COUNT(*) as total_messages,
+        COUNT(CASE WHEN is_read = false AND receiver_id = $1 THEN 1 END) as unread_count,
+        COUNT(DISTINCT CASE WHEN sender_id = $1 THEN receiver_id ELSE sender_id END) as conversation_count
+      FROM messages 
+      WHERE sender_id = $1 OR receiver_id = $1
+    `, [userId]);
+
+    res.json({
+      success: true,
+      data: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error fetching message stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Hiba a statisztikák betöltése során'
+    });
+  }
+});
+
+// ⚠️ FONTOS: Egyszerű export, nem objektum!
+module.exports = router;
