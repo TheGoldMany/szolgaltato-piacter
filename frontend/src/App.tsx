@@ -13,6 +13,7 @@ import ModularProfileEditor from './components/profile/ModularProfileEditor';
 import ProjectManager from './pages/ProjectManager';
 import CoursesPage from './pages/CoursesPage';
 import CourseDetailPage from './pages/CourseDetailPage';
+import MessagesPage from './pages/MessagesPage'; // Új import
 import './App.css';
 import HowItWorksPage from './pages/HowItWorksPage';
 import AIChatPage from './pages/AIChatPage';
@@ -127,14 +128,7 @@ const App: React.FC = () => {
               path="/messages" 
               element={
                 <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 navbar-padding">
-                    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-                      <div className="text-center">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-4">💬 Üzenetek</h1>
-                        <p className="text-gray-600">Az üzenetküldő funkció hamarosan elérhető lesz.</p>
-                      </div>
-                    </div>
-                  </div>
+                  <MessagesPage />
                 </ProtectedRoute>
               } 
             />

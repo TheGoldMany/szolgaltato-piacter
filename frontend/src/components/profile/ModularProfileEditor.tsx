@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Layout from '../layout/Layout';
 import Container from '../layout/Container';
 import Card from '../common/Card';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext'; // ← Ez hiányzott!
 import Navbar from '../layout/Navbar';
 // Types
 interface GridPosition {
@@ -113,6 +113,7 @@ const GRID_CONFIG = {
 };
 
 const ModularProfileEditor: React.FC = () => {
+  const { user } = useAuth(); // ← Ez hiányzott!
   const [modules, setModules] = useState<ModuleData[]>([]);
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -120,6 +121,8 @@ const ModularProfileEditor: React.FC = () => {
   const [draggedModule, setDraggedModule] = useState<ModuleData | null>(null);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [dropIndicator, setDropIndicator] = useState<GridPosition | null>(null);
+  const [userProfileId, setUserProfileId] = useState<number | null>(null); // ← Új state a profile ID-hoz
+
   
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -502,6 +505,81 @@ const ModularProfileEditor: React.FC = () => {
       setIsLoading(false);
     }
   };
+  const saveModules = async () => {
+  setIsLoading(true);
+  try {
+    const response = await fetch('/api/profiles/modules', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+      },
+      body: JSON.stringify({ modules })
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      alert('✅ Modulok sikeresen elmentve!');
+    } else {
+      alert('❌ Hiba: ' + data.error);
+    }
+  } catch (error) {
+    console.error('Error saving modules:', error);
+    alert('❌ Hiba történt a mentés során');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+// Load existing modules on component mount
+const loadExistingModules = async () => {
+  try {
+    const response = await fetch('/api/profiles/me', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+      }
+    });
+
+    const data = await response.json();
+    
+    if (data.success && data.data?.modules) {
+      // Convert backend module format to frontend format
+      const convertedModules: ModuleData[] = data.data.modules.map((backendModule: any) => ({
+        id: backendModule.module_id,
+        type: backendModule.module_type,
+        position: {
+          x: backendModule.position_x,
+          y: backendModule.position_y,
+          width: backendModule.position_width,
+          height: backendModule.position_height
+        },
+        content: backendModule.content,
+        isVisible: backendModule.is_visible,
+        sortOrder: backendModule.sort_order
+      }));
+      
+      setModules(convertedModules);
+    }
+  } catch (error) {
+    console.error('Error loading modules:', error);
+  }
+
+  
+};
+
+// Add this useEffect to load existing modules
+useEffect(() => {
+  loadExistingModules();
+}, []);
+
+ const handlePreviewClick = () => {
+    if (userProfileId) {
+      window.open(`/profile/${userProfileId}`, '_blank');
+    } else {
+      alert('Először mentsd el a profilt a preview megtekintéséhez!');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 navbar-padding">
@@ -522,20 +600,40 @@ const ModularProfileEditor: React.FC = () => {
           </div>
           
           <button
-            onClick={saveProfile}
-            disabled={isLoading}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              opacity: isLoading ? 0.5 : 1
-            }}
-          >
-            {isLoading ? '💾 Mentés...' : '💾 Mentés'}
-          </button>
+  onClick={saveModules}
+  disabled={isLoading}
+  style={{
+    padding: '12px 24px',
+    backgroundColor: isLoading ? '#9ca3af' : '#3b82f6',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '16px',
+    fontWeight: '600',
+    cursor: isLoading ? 'not-allowed' : 'pointer',
+    transition: 'all 0.2s ease'
+  }}
+>
+  {isLoading ? '💾 Mentés...' : '💾 Mentés'}
+</button>
+
+                <button
+                onClick={handlePreviewClick}
+                disabled={!userProfileId}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: userProfileId ? '#10b981' : '#9ca3af',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  cursor: userProfileId ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                👁️ Előnézet
+              </button>
         </div>
       </div>
 
