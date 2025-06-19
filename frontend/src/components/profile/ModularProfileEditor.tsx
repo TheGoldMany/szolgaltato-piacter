@@ -505,10 +505,13 @@ const ModularProfileEditor: React.FC = () => {
       setIsLoading(false);
     }
   };
+
   const saveModules = async () => {
   setIsLoading(true);
   try {
-    const response = await fetch('/api/profiles/modules', {
+    console.log('🚀 Mentés indítása, modulok:', modules);
+    
+    const response = await fetch('http://localhost:5000/api/users/profiles/modules', {  // ✅ TELJES URL
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -517,16 +520,18 @@ const ModularProfileEditor: React.FC = () => {
       body: JSON.stringify({ modules })
     });
 
+    console.log('📡 Response status:', response.status);
     const data = await response.json();
+    console.log('📦 Response data:', data);
     
     if (data.success) {
       alert('✅ Modulok sikeresen elmentve!');
     } else {
-      alert('❌ Hiba: ' + data.error);
+      alert('❌ Hiba: ' + (data.error || 'Ismeretlen hiba'));
     }
   } catch (error) {
-    console.error('Error saving modules:', error);
-    alert('❌ Hiba történt a mentés során');
+    console.error('❌ Fetch error:', error);
+    alert('❌ Hiba történt a mentés során: ' + error);
   } finally {
     setIsLoading(false);
   }
@@ -535,13 +540,14 @@ const ModularProfileEditor: React.FC = () => {
 // Load existing modules on component mount
 const loadExistingModules = async () => {
   try {
-    const response = await fetch('/api/profiles/me', {
+    const response = await fetch('http://localhost:5000/api/users/profiles/me', {  // ✅ TELJES URL
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('authToken')}`
       }
     });
 
     const data = await response.json();
+    console.log('📥 Loaded profile data:', data);
     
     if (data.success && data.data?.modules) {
       // Convert backend module format to frontend format
@@ -559,13 +565,12 @@ const loadExistingModules = async () => {
         sortOrder: backendModule.sort_order
       }));
       
+      console.log('📦 Converted modules:', convertedModules);
       setModules(convertedModules);
     }
   } catch (error) {
-    console.error('Error loading modules:', error);
+    console.error('❌ Error loading modules:', error);
   }
-
-  
 };
 
 // Add this useEffect to load existing modules

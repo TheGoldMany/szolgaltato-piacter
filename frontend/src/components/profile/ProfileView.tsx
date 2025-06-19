@@ -1,32 +1,24 @@
-// frontend/src/components/profile/ProfileView.tsx - Moduláris grid verzió
+// frontend/src/components/profile/StandardProfileView.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Navbar from '../layout/Navbar';
-
-interface GridPosition {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-interface ModuleData {
-  id: string;
-  type: string;
-  position: GridPosition;
-  content: any;
-  isVisible: boolean;
-  sortOrder: number;
-}
 
 interface ServiceProfile {
   id: number;
   business_name: string;
   description: string;
   profile_image_url: string;
+  location_city: string;
+  location_address: string;
+  price_category: 'budget' | 'mid' | 'premium';
+  price_range_min: number;
+  price_range_max: number;
+  contact_phone: string;
+  contact_email: string;
+  availability_hours: string;
+  specializations: string[];
   user_id: number;
-  modules: ModuleData[];
   user: {
     first_name: string;
     last_name: string;
@@ -34,15 +26,7 @@ interface ServiceProfile {
   };
 }
 
-const GRID_CONFIG = {
-  cols: 4,
-  rows: 8,
-  cellWidth: 200,
-  cellHeight: 100,
-  gap: 8
-};
-
-const ProfileView: React.FC = () => {
+const StandardProfileView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -74,7 +58,6 @@ const ProfileView: React.FC = () => {
     }
   };
 
-  // Quick Actions handlers
   const handleContactClick = () => {
     if (!isAuthenticated) {
       navigate('/login', { 
@@ -114,229 +97,47 @@ const ProfileView: React.FC = () => {
           id: profile?.id,
           name: profile?.business_name,
           userId: profile?.user_id,
-          category: profile?.description,
+          category: profile?.specializations?.[0],
           profileImage: profile?.profile_image_url
         }
       }
     });
   };
 
-  // Render individual module based on type
-  const renderModule = (module: ModuleData) => {
-    const style = {
-      position: 'absolute' as const,
-      left: module.position.x * (GRID_CONFIG.cellWidth + GRID_CONFIG.gap),
-      top: module.position.y * (GRID_CONFIG.cellHeight + GRID_CONFIG.gap),
-      width: module.position.width * GRID_CONFIG.cellWidth + (module.position.width - 1) * GRID_CONFIG.gap,
-      height: module.position.height * GRID_CONFIG.cellHeight + (module.position.height - 1) * GRID_CONFIG.gap,
-      backgroundColor: 'white',
-      borderRadius: '12px',
-      padding: '16px',
-      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-      border: '1px solid #e5e7eb',
-      overflow: 'hidden'
-    };
+  const handleBookingClick = () => {
+    if (!isAuthenticated) {
+      navigate('/login', { 
+        state: { 
+          redirectTo: `/profile/${id}`,
+          message: 'Jelentkezz be az időpont foglaláshoz!' 
+        }
+      });
+      return;
+    }
 
-    if (!module.isVisible) return null;
+    navigate('/booking', { 
+      state: { 
+        providerId: profile?.id,
+        providerName: profile?.business_name
+      }
+    });
+  };
 
-    switch (module.type) {
-      case 'hero':
-        return (
-          <div key={module.id} style={style}>
-            <div className="h-full flex flex-col justify-center items-center text-center">
-              {profile?.profile_image_url && (
-                <img
-                  src={profile.profile_image_url}
-                  alt={module.content.title}
-                  className="w-16 h-16 rounded-full object-cover mb-3"
-                />
-              )}
-              <h1 className="text-xl font-bold text-gray-900 mb-1">
-                {module.content.title || profile?.business_name}
-              </h1>
-              <p className="text-gray-600 text-sm">
-                {module.content.subtitle || profile?.description}
-              </p>
-            </div>
-          </div>
-        );
+  const getPriceCategoryText = (category: string) => {
+    switch (category) {
+      case 'budget': return 'Kedvező árak';
+      case 'mid': return 'Közepes árak';
+      case 'premium': return 'Prémium árak';
+      default: return 'Árak egyeztethetők';
+    }
+  };
 
-      case 'text':
-        return (
-          <div key={module.id} style={style}>
-            <div className="h-full">
-              {module.content.title && (
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {module.content.title}
-                </h3>
-              )}
-              <div className="text-gray-700 text-sm leading-relaxed overflow-y-auto">
-                {module.content.content}
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'contact':
-        return (
-          <div key={module.id} style={style}>
-            <div className="h-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">📞 Kapcsolat</h3>
-              <div className="space-y-2">
-                {module.content.phone && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span>📱</span>
-                    <a href={`tel:${module.content.phone}`} className="text-blue-600 hover:underline">
-                      {module.content.phone}
-                    </a>
-                  </div>
-                )}
-                {module.content.email && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span>✉️</span>
-                    <a href={`mailto:${module.content.email}`} className="text-blue-600 hover:underline">
-                      {module.content.email}
-                    </a>
-                  </div>
-                )}
-                {module.content.address && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span>📍</span>
-                    <span className="text-gray-600">{module.content.address}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'price_list':
-        return (
-          <div key={module.id} style={style}>
-            <div className="h-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                💰 {module.content.title || 'Árlista'}
-              </h3>
-              <div className="space-y-2 overflow-y-auto">
-                {module.content.items?.map((item: any, index: number) => (
-                  <div key={index} className="flex justify-between items-center text-sm">
-                    <span className="text-gray-700">{item.service}</span>
-                    <span className="font-semibold text-blue-600">
-                      {parseInt(item.price).toLocaleString()} Ft
-                      {item.unit && <span className="text-xs text-gray-500">/{item.unit}</span>}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'stats':
-        return (
-          <div key={module.id} style={style}>
-            <div className="h-full flex items-center justify-around">
-              {module.content.items?.map((stat: any, index: number) => (
-                <div key={index} className="text-center">
-                  <div className="text-2xl mb-1">{stat.icon}</div>
-                  <div className="text-xl font-bold text-blue-600">{stat.value}</div>
-                  <div className="text-xs text-gray-600">{stat.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 'gallery':
-        return (
-          <div key={module.id} style={style}>
-            <div className="h-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                🖼️ {module.content.title || 'Galéria'}
-              </h3>
-              {module.content.images?.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2 h-full overflow-hidden">
-                  {module.content.images.slice(0, 4).map((image: string, index: number) => (
-                    <img
-                      key={index}
-                      src={image}
-                      alt={`Galéria ${index + 1}`}
-                      className="w-full h-full object-cover rounded"
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-400">
-                  <div className="text-center">
-                    <div className="text-2xl mb-2">📷</div>
-                    <div className="text-sm">Nincsenek képek</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-
-      case 'video':
-        return (
-          <div key={module.id} style={style}>
-            <div className="h-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                🎥 {module.content.title || 'Videó'}
-              </h3>
-              {module.content.videoUrl ? (
-                <iframe
-                  src={module.content.videoUrl}
-                  className="w-full h-full rounded"
-                  frameBorder="0"
-                  allowFullScreen
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-400">
-                  <div className="text-center">
-                    <div className="text-2xl mb-2">🎬</div>
-                    <div className="text-sm">Nincs videó</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-
-      case 'social':
-        return (
-          <div key={module.id} style={style}>
-            <div className="h-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">🌐 Közösségi média</h3>
-              <div className="flex flex-wrap gap-2">
-                {module.content.links?.map((link: any, index: number) => (
-                  <a
-                    key={index}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded text-sm hover:bg-gray-200"
-                  >
-                    <span>{link.icon}</span>
-                    <span>{link.name}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-
-      default:
-        return (
-          <div key={module.id} style={style}>
-            <div className="h-full flex items-center justify-center text-gray-400">
-              <div className="text-center">
-                <div className="text-2xl mb-2">❓</div>
-                <div className="text-sm">Ismeretlen modul</div>
-              </div>
-            </div>
-          </div>
-        );
+  const getPriceCategoryColor = (category: string) => {
+    switch (category) {
+      case 'budget': return 'bg-green-100 text-green-800';
+      case 'mid': return 'bg-yellow-100 text-yellow-800';
+      case 'premium': return 'bg-purple-100 text-purple-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -376,7 +177,7 @@ const ProfileView: React.FC = () => {
     <div className="min-h-screen bg-gray-50 navbar-padding">
       <Navbar />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <button
           onClick={() => navigate(-1)}
@@ -385,64 +186,173 @@ const ProfileView: React.FC = () => {
           ← Vissza az eredményekhez
         </button>
 
-        {/* Profile Grid Layout */}
-        <div className="flex justify-center">
-          <div
-            style={{
-              position: 'relative',
-              width: GRID_CONFIG.cols * GRID_CONFIG.cellWidth + (GRID_CONFIG.cols - 1) * GRID_CONFIG.gap,
-              height: GRID_CONFIG.rows * GRID_CONFIG.cellHeight + (GRID_CONFIG.rows - 1) * GRID_CONFIG.gap,
-              backgroundColor: '#f8fafc',
-              borderRadius: '12px',
-              padding: '16px'
-            }}
-          >
-            {/* Render modules if they exist */}
-            {profile.modules && profile.modules.length > 0 
-              ? profile.modules.map(renderModule)
-              : (
-                /* Default empty state */
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center text-gray-500">
-                    <div className="text-6xl mb-4">📋</div>
-                    <h3 className="text-xl font-semibold mb-2">Profil még nem készült el</h3>
-                    <p>A szolgáltató még nem állította be a moduláris profilját.</p>
-                    {profile.business_name && (
-                      <div className="mt-6 p-4 bg-white rounded-lg shadow-sm">
-                        <h4 className="font-semibold text-gray-900">{profile.business_name}</h4>
-                        {profile.description && (
-                          <p className="text-gray-600 mt-2">{profile.description}</p>
-                        )}
-                      </div>
-                    )}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* Hero Section */}
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl text-white p-8">
+              <div className="flex items-start gap-6">
+                <div className="w-24 h-24 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-3xl font-bold flex-shrink-0">
+                  {profile.profile_image_url ? (
+                    <img
+                      src={profile.profile_image_url}
+                      alt={profile.business_name}
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    profile.business_name.charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h1 className="text-3xl font-bold mb-2">{profile.business_name}</h1>
+                  <p className="text-blue-100 text-lg mb-3">
+                    📍 {profile.location_city}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.specializations?.map((spec, index) => (
+                      <span 
+                        key={index}
+                        className="px-3 py-1 bg-white bg-opacity-20 rounded-full text-sm"
+                      >
+                        {spec}
+                      </span>
+                    ))}
                   </div>
                 </div>
-              )
-            }
-          </div>
-        </div>
-
-        {/* Quick Actions - Always visible */}
-        <div className="mt-8 flex justify-center">
-          <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
-              🚀 Kapcsolatfelvétel
-            </h3>
-            <div className="space-y-3">
-              <button 
-                onClick={handleContactClick}
-                className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-              >
-                💬 Üzenet küldése
-              </button>
-              
-              <button 
-                onClick={handleProjectStart}
-                className="w-full px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
-              >
-                📋 Projekt indítása
-              </button>
+              </div>
             </div>
+
+            {/* Description */}
+            <div className="bg-white rounded-xl p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">📋 Bemutatkozás</h2>
+              <p className="text-gray-700 leading-relaxed">
+                {profile.description || 'A szolgáltató még nem írt bemutatkozást.'}
+              </p>
+            </div>
+
+            {/* Price Information */}
+            <div className="bg-white rounded-xl p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">💰 Árazás</h2>
+              <div className="flex items-center gap-4">
+                <span className={`px-4 py-2 rounded-full text-sm font-medium ${getPriceCategoryColor(profile.price_category)}`}>
+                  {getPriceCategoryText(profile.price_category)}
+                </span>
+                {profile.price_range_min && profile.price_range_max && (
+                  <span className="text-lg font-semibold text-gray-900">
+                    {profile.price_range_min.toLocaleString()} - {profile.price_range_max.toLocaleString()} Ft
+                  </span>
+                )}
+              </div>
+              <p className="text-gray-600 text-sm mt-3">
+                Az árak tájékoztató jellegűek. Pontos árajánlatért vedd fel a kapcsolatot!
+              </p>
+            </div>
+
+            {/* Location */}
+            <div className="bg-white rounded-xl p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">📍 Helyszín</h2>
+              <div className="space-y-2">
+                <p className="text-gray-700 font-medium">{profile.location_city}</p>
+                {profile.location_address && (
+                  <p className="text-gray-600">{profile.location_address}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Availability */}
+            {profile.availability_hours && (
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">🕒 Elérhetőség</h2>
+                <p className="text-gray-700">{profile.availability_hours}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            
+            {/* Quick Actions */}
+            <div className="bg-white rounded-xl shadow-lg p-6 sticky top-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                🚀 Kapcsolatfelvétel
+              </h3>
+              <div className="space-y-3">
+                <button 
+                  onClick={handleContactClick}
+                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                >
+                  💬 Üzenet küldése
+                </button>
+                
+                <button 
+                  onClick={handleProjectStart}
+                  className="w-full px-4 py-3 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors font-semibold"
+                >
+                  📋 Projekt indítása
+                </button>
+
+                <button 
+                  onClick={handleBookingClick}
+                  className="w-full px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+                >
+                  📅 Időpont foglalás
+                </button>
+              </div>
+            </div>
+
+            {/* Contact Information */}
+            <div className="bg-white rounded-xl p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                📞 Elérhetőségek
+              </h3>
+              <div className="space-y-3">
+                {profile.contact_phone && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-blue-600">📱</span>
+                    <a 
+                      href={`tel:${profile.contact_phone}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      {profile.contact_phone}
+                    </a>
+                  </div>
+                )}
+                {profile.contact_email && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-blue-600">✉️</span>
+                    <a 
+                      href={`mailto:${profile.contact_email}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      {profile.contact_email}
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Trust Indicators */}
+            <div className="bg-white rounded-xl p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                ✅ Bizalom
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-green-600">✓</span>
+                  <span className="text-gray-700">Ellenőrzött profil</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-green-600">✓</span>
+                  <span className="text-gray-700">Aktív a platformon</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-green-600">✓</span>
+                  <span className="text-gray-700">Gyors válaszadó</span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -450,4 +360,4 @@ const ProfileView: React.FC = () => {
   );
 };
 
-export default ProfileView;
+export default StandardProfileView;

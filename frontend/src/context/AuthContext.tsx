@@ -1,3 +1,4 @@
+// frontend/src/context/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService } from '../services/authService';
 
@@ -7,6 +8,7 @@ interface User {
   firstName: string;
   lastName: string;
   userType: 'service_provider' | 'customer';
+  profileImage?: string; // Hozzáadva
 }
 
 interface AuthContextType {
@@ -16,6 +18,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => void;
+  updateUser: (userData: Partial<User>) => void; // ÚJ: updateUser funkció
 }
 
 interface RegisterData {
@@ -64,6 +67,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(null);
   };
 
+  // ÚJ: updateUser funkció
+  const updateUser = (userData: Partial<User>) => {
+    if (user) {
+      const updatedUser = { ...user, ...userData };
+      setUser(updatedUser);
+      
+      // Frissítjük a localStorage-ban is
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+  };
+
   const value = {
     user,
     isAuthenticated: !!user,
@@ -71,6 +85,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     login,
     register,
     logout,
+    updateUser, // Hozzáadva az értékekhez
   };
 
   return (

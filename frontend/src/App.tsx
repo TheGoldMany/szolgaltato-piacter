@@ -13,12 +13,14 @@ import ModularProfileEditor from './components/profile/ModularProfileEditor';
 import ProjectManager from './pages/ProjectManager';
 import CoursesPage from './pages/CoursesPage';
 import CourseDetailPage from './pages/CourseDetailPage';
-import MessagesPage from './pages/MessagesPage'; // Új import
-import './App.css';
+import MessagesPage from './pages/MessagesPage';
 import HowItWorksPage from './pages/HowItWorksPage';
 import AIChatPage from './pages/AIChatPage';
+import SettingsPage from './pages/SettingsPage'; // Új import
+import RoleProtectedRoute from './components/auth/RoleProtectedRoute'; // Új import
+import './App.css';
 
-// Protected Route component
+// Standard Protected Route component (csak bejelentkezést ellenőriz)
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -48,36 +50,18 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return !isAuthenticated ? <>{children}</> : <Navigate to="/dashboard" />;
 };
 
-const App: React.FC = () => {
+function App() {
   return (
     <AuthProvider>
       <Router>
         <div className="App">
           <Routes>
-            {/* Public Routes */}
+            {/* ==================== PUBLIC ROUTES ==================== */}
+            
+            {/* Homepage - mindenki számára elérhető */}
             <Route path="/" element={<HomePage />} />
-            <Route path="/services" element={<ServiceProviders />} />
-            <Route path="/browse" element={<ServiceProviders />} />
-            <Route path="/profile/:id" element={<ProfileView />} />
-            <Route path="/how-it-works" element={<HowItWorksPage />} />
             
-            {/* Courses Routes */}
-            <Route path="/courses" element={<CoursesPage />} />
-            <Route path="/courses/:id" element={<CourseDetailPage />} />
-            <Route path="/categories" element={<CoursesPage />} />
-            
-            {/* AI Chat Routes */}
-            <Route path="/ai-chat" element={<AIChatPage />} />
-            <Route 
-              path="/ai-chat/history" 
-              element={
-                <ProtectedRoute>
-                  <AIChatPage showHistory={true} />
-                </ProtectedRoute>
-              } 
-            />
-            
-            {/* Auth Routes */}
+            {/* Authentication Routes - csak vendégek számára */}
             <Route 
               path="/login" 
               element={
@@ -95,7 +79,17 @@ const App: React.FC = () => {
               } 
             />
 
-            {/* Protected Routes */}
+            {/* Public browsing - regisztráció nélkül is elérhető */}
+            <Route path="/services" element={<ServiceProviders />} />
+            <Route path="/how-it-works" element={<HowItWorksPage />} />
+            <Route path="/ai-chat" element={<AIChatPage />} />
+            <Route path="/categories" element={<CoursesPage />} />
+            <Route path="/courses/:id" element={<CourseDetailPage />} />
+            <Route path="/profile/:id" element={<ProfileView />} />
+
+            {/* ==================== PROTECTED ROUTES (Általános) ==================== */}
+            
+            {/* Dashboard - minden bejelentkezett user számára */}
             <Route 
               path="/dashboard" 
               element={
@@ -105,25 +99,7 @@ const App: React.FC = () => {
               } 
             />
 
-            {/* Profile Routes */}
-            <Route 
-              path="/profile/edit" 
-              element={
-                <ProtectedRoute>
-                  <ProfileEditor />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/profile/modular-editor" 
-              element={
-                <ProtectedRoute>
-                  <ModularProfileEditor />
-                </ProtectedRoute>
-              } 
-            />
-
-            {/* Messages Route */}
+            {/* Messages - minden bejelentkezett user számára */}
             <Route 
               path="/messages" 
               element={
@@ -133,7 +109,29 @@ const App: React.FC = () => {
               } 
             />
 
-            {/* Projects Route */}
+            {/* ==================== SERVICE PROVIDER ONLY ROUTES ==================== */}
+            
+            {/* Moduláris profil szerkesztő - CSAK szolgáltatóknak */}
+            <Route 
+              path="/profile/modular-editor" 
+              element={
+                <RoleProtectedRoute requiredRole="service_provider">
+                  <ModularProfileEditor />
+                </RoleProtectedRoute>
+              } 
+            />
+
+            {/* Teljes profil szerkesztő - CSAK szolgáltatóknak */}
+            <Route 
+              path="/profile/edit" 
+              element={
+                <RoleProtectedRoute requiredRole="service_provider">
+                  <ProfileEditor />
+                </RoleProtectedRoute>
+              } 
+            />
+
+            {/* Projektek/Workspace - MINDEN bejelentkezett felhasználónak */}
             <Route 
               path="/projects" 
               element={
@@ -151,11 +149,28 @@ const App: React.FC = () => {
               } 
             />
 
-            {/* Course Learning Routes - Protected */}
+            {/* Megrendelések - CSAK szolgáltatóknak */}
+            <Route 
+              path="/orders" 
+              element={
+                <RoleProtectedRoute requiredRole="service_provider">
+                  <div className="min-h-screen bg-gray-50 navbar-padding">
+                    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                      <div className="text-center">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4">📦 Megrendelések</h1>
+                        <p className="text-gray-600">A megrendeléskezelő felület hamarosan elérhető lesz.</p>
+                      </div>
+                    </div>
+                  </div>
+                </RoleProtectedRoute>
+              } 
+            />
+
+            {/* Szakképzési tanúsítványok kezelése - CSAK szolgáltatóknak */}
             <Route 
               path="/courses/:id/learn" 
               element={
-                <ProtectedRoute>
+                <RoleProtectedRoute requiredRole="service_provider">
                   <div className="min-h-screen bg-gray-50 navbar-padding">
                     <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
                       <div className="text-center">
@@ -164,115 +179,100 @@ const App: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                </ProtectedRoute>
+                </RoleProtectedRoute>
               } 
             />
 
-            {/* User Course Management - Protected */}
+            {/* Tanúsítványok kezelése - CSAK szolgáltatóknak */}
             <Route 
               path="/my-courses" 
               element={
-                <ProtectedRoute>
+                <RoleProtectedRoute requiredRole="service_provider">
                   <div className="min-h-screen bg-gray-50 navbar-padding">
                     <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
                       <div className="text-center">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-4">📖 Kurzusaim</h1>
-                        <p className="text-gray-600">A kurzusok kezelése hamarosan elérhető lesz.</p>
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4">🎓 Tanúsítványaim</h1>
+                        <p className="text-gray-600">A tanúsítványkezelő felület hamarosan elérhető lesz.</p>
                       </div>
                     </div>
                   </div>
-                </ProtectedRoute>
+                </RoleProtectedRoute>
               } 
             />
 
-            <Route 
-              path="/my-certificates" 
-              element={
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 navbar-padding">
-                    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-                      <div className="text-center">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-4">🏆 Tanúsítványaim</h1>
-                        <p className="text-gray-600">A tanúsítványok megtekintése hamarosan elérhető lesz.</p>
-                      </div>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              } 
-            />
-
-            {/* Additional Protected Routes */}
-            <Route 
-              path="/orders" 
-              element={
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 navbar-padding">
-                    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-                      <div className="text-center">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-4">📦 Megrendelések</h1>
-                        <p className="text-gray-600">A megrendelések kezelése hamarosan elérhető lesz.</p>
-                      </div>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              } 
-            />
-
+            {/* ==================== CUSTOMER ONLY ROUTES ==================== */}
+            
+            {/* Foglalások - CSAK ügyfeleknek */}
             <Route 
               path="/bookings" 
               element={
-                <ProtectedRoute>
+                <RoleProtectedRoute requiredRole="customer">
                   <div className="min-h-screen bg-gray-50 navbar-padding">
                     <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
                       <div className="text-center">
                         <h1 className="text-3xl font-bold text-gray-900 mb-4">📅 Foglalásaim</h1>
-                        <p className="text-gray-600">A foglalások kezelése hamarosan elérhető lesz.</p>
+                        <p className="text-gray-600">A foglaláskezelő felület hamarosan elérhető lesz.</p>
                       </div>
                     </div>
                   </div>
-                </ProtectedRoute>
+                </RoleProtectedRoute>
               } 
             />
 
+            {/* Kedvencek - CSAK ügyfeleknek */}
             <Route 
               path="/favorites" 
               element={
-                <ProtectedRoute>
+                <RoleProtectedRoute requiredRole="customer">
                   <div className="min-h-screen bg-gray-50 navbar-padding">
                     <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
                       <div className="text-center">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-4">❤️ Kedvencek</h1>
-                        <p className="text-gray-600">A kedvencek kezelése hamarosan elérhető lesz.</p>
+                        <h1 className="text-3xl font-bold text-gray-900 mb-4">❤️ Kedvenc szolgáltatók</h1>
+                        <p className="text-gray-600">A kedvencek felület hamarosan elérhető lesz.</p>
                       </div>
                     </div>
                   </div>
-                </ProtectedRoute>
+                </RoleProtectedRoute>
               } 
             />
 
+            {/* ==================== SETTINGS ==================== */}
+            
+            {/* Beállítások - minden bejelentkezett user számára */}
             <Route 
               path="/settings" 
               element={
                 <ProtectedRoute>
-                  <div className="min-h-screen bg-gray-50 navbar-padding">
-                    <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-                      <div className="text-center">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-4">⚙️ Beállítások</h1>
-                        <p className="text-gray-600">A beállítások hamarosan elérhetőek lesznek.</p>
-                      </div>
-                    </div>
-                  </div>
+                  <SettingsPage />
                 </ProtectedRoute>
               } 
             />
 
-            {/* Catch-all Route */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* ==================== 404 ROUTE ==================== */}
+            
+            {/* Catch-all route */}
+            <Route 
+              path="*" 
+              element={
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                  <div className="text-center">
+                    <h1 className="text-4xl font-bold text-gray-900 mb-4">404</h1>
+                    <p className="text-gray-600 mb-8">Az oldal nem található.</p>
+                    <button 
+                      onClick={() => window.location.href = '/'}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Vissza a főoldalra
+                    </button>
+                  </div>
+                </div>
+              } 
+            />
           </Routes>
         </div>
       </Router>
     </AuthProvider>
   );
-};
+}
 
 export default App;

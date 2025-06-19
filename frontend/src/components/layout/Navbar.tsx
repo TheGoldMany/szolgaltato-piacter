@@ -52,6 +52,7 @@ const Navbar: React.FC = () => {
       { href: '/dashboard', label: 'Dashboard', icon: '📊' },
       { href: '/messages', label: 'Üzenetek', icon: '💬' },
       { href: '/settings', label: 'Beállítások', icon: '⚙️' },
+      { href: '/workspace', label: 'Projektek', icon: '🏗️' },
     ];
 
     // Service provider specific items
@@ -61,7 +62,6 @@ const Navbar: React.FC = () => {
         { href: '/profile/edit', label: 'Profil szerkesztése', icon: '👤' },
         { href: '/profile/modular-editor', label: 'Moduláris szerkesztő', icon: '🎨', highlight: true },
         { href: '/orders', label: 'Megrendelések', icon: '📦' },
-        { href: '/workspace', label: 'Projektek', icon: '🏗️' },
         baseItems[1], // Messages
         baseItems[2], // Settings
         { href: '#logout', label: 'Kijelentkezés', icon: '🚪', action: 'logout' },
@@ -71,8 +71,8 @@ const Navbar: React.FC = () => {
     // Customer specific items
     return [
       baseItems[0], // Dashboard
-      { href: '/profile/edit', label: 'Profil szerkesztése', icon: '👤' },
       { href: '/bookings', label: 'Foglalásaim', icon: '📅' },
+      { href: '/workspace', label: 'Projektek', icon: '🏗️' },
       { href: '/favorites', label: 'Kedvencek', icon: '❤️' },
       baseItems[1], // Messages
       baseItems[2], // Settings

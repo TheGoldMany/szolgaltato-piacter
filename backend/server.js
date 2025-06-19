@@ -3,14 +3,40 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const pool = require('./config/database');
+
+// MINDEN ROUTE IMPORT A TETEJÉN!
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profiles');
 const uploadRoutes = require('./routes/upload');
 const serviceProfilesRoutes = require('./routes/serviceProfiles');
+
+// Próbáljuk meg betölteni az opcionális route-okat
+let messagesRoutes, projectRoutes, coursesRoutes;
+
+try {
+  messagesRoutes = require('./routes/messages');
+  console.log('✅ Messages routes loaded');
+} catch (error) {
+  console.log('⚠️ Messages routes not found:', error.message);
+}
+
+try {
+  projectRoutes = require('./routes/projects');
+  console.log('✅ Projects routes loaded');
+} catch (error) {
+  console.log('⚠️ Projects routes not found:', error.message);
+}
+
+try {
+  coursesRoutes = require('./routes/courses');
+  console.log('✅ Courses routes loaded');
+} catch (error) {
+  console.log('⚠️ Courses routes not found:', error.message);
+}
+
 require('dotenv').config();
 
-
-// CORS configuration frissítés
+// CORS configuration
 const corsOptions = {
   origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -21,21 +47,14 @@ const corsOptions = {
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+// MIDDLEWARE - HELYES SORREND!
 app.use(helmet());
 app.use(cors(corsOptions));
 app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
-// ÚJ - Auth routes RÖGTÖN a middleware után!
-app.use('/api/auth', authRoutes);
-app.use('/api/users/profiles', profileRoutes);  // User saját profil kezeléshez
-app.use('/api/upload', uploadRoutes);
-app.use('/api/profiles', serviceProfilesRoutes);  // Public profil megtekintéshez
-
-// Existing routes
+// HEALTH CHECK ENDPOINTS ELŐSZÖR
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Szolgáltató Piactér API működik! 🚀',
@@ -76,25 +95,56 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Error handling middleware
+// API ROUTES - KÖTELEZŐ ROUTE-OK
+app.use('/api/auth', authRoutes);
+app.use('/api/users/profiles', profileRoutes);  // User saját profil kezeléshez
+app.use('/api/upload', uploadRoutes);
+app.use('/api/profiles', serviceProfilesRoutes);  // Public profil megtekintéshez
+
+// OPCIONÁLIS ROUTES - CSAK HA LÉTEZNEK
+if (messagesRoutes) {
+  app.use('/api/messages', messagesRoutes);
+  console.log('🔗 Messages API registered at /api/messages');
+}
+
+if (projectRoutes) {
+  app.use('/api/projects', projectRoutes);
+  console.log('🔗 Projects API registered at /api/projects');
+}
+
+if (coursesRoutes) {
+  app.use('/api/courses', coursesRoutes);
+  console.log('🔗 Courses API registered at /api/courses');
+}
+
+// ERROR HANDLING MIDDLEWARE
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('🚨 Server Error:', err.stack);
   res.status(500).json({ 
     error: 'Valami hiba történt!',
     message: process.env.NODE_ENV === 'development' ? err.message : 'Server Error'
   });
 });
 
-// 404 handler - UTOLSÓNAK!
+// 404 HANDLER - UTOLSÓNAK!
 app.use((req, res) => {
+  console.log(`❌ 404 - Route not found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({ 
     error: 'Endpoint nem található',
     path: req.originalUrl,
-    method: req.method
+    method: req.method,
+    availableEndpoints: [
+      'GET /',
+      'GET /health',
+      'GET /api',
+      'POST /api/auth/register',
+      'POST /api/auth/login',
+      'GET /api/auth/test'
+    ]
   });
 });
 
-// Server start csak ha nem teszt
+// SERVER START - CSAK HA NEM TESZT
 let server;
 if (process.env.NODE_ENV !== 'test') {
   server = app.listen(PORT, () => {
@@ -102,8 +152,9 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`📊 Health check: http://localhost:${PORT}/health`);
     console.log(`🔧 API docs: http://localhost:${PORT}/api`);
     console.log(`🔐 Auth test: http://localhost:${PORT}/api/auth/test`);
-console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);  });
-}
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+
   // Graceful shutdown
   process.on('SIGTERM', () => {
     console.log('SIGTERM signal received: closing HTTP server');
@@ -111,29 +162,6 @@ console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);  });
       console.log('HTTP server closed');
     });
   });
-// Próbáld meg betölteni a messages route-ot
-let messagesRoutes;
-try {
-  messagesRoutes = require('./routes/messages');
-  app.use('/api/messages', messagesRoutes);
-  console.log('✅ Messages routes loaded successfully');
-} catch (error) {
-  console.log('⚠️ Messages routes not found:', error.message);
 }
-let projectRoutes;
-try {
-  projectRoutes = require('./routes/projects');
-  app.use('/api/projects', projectRoutes);
-  console.log('✅ Projects routes loaded successfully');
-} catch (error) {
-  console.log('⚠️ Projects routes not found:', error.message);
-}
-let coursesRoutes;
-try {
-  coursesRoutes = require('./routes/courses');
-  app.use('/api/courses', coursesRoutes);
-  console.log('✅ Courses routes loaded successfully');
-} catch (error) {
-  console.log('⚠️ Courses routes not found:', error.message);
-}
+
 module.exports = app;
