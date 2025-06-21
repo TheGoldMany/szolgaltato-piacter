@@ -1,128 +1,66 @@
-const jwt = require('jsonwebtoken');
-const pool = require('../config/database');
+// backend/middleware/auth.js - ES MODULES ÁTÍRÁS
+import jwt from 'jsonwebtoken';
+import pool from '../config/database.js';
 
-// JWT token verification middleware (optional auth)
+// JWT token ellenőrzés middleware
 const authenticateToken = async (req, res, next) => {
   try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
     if (!token) {
-      req.user = null;
-      return next();
+      return res.status(401).json({
+        success: false,
+        error: 'Hozzáférés megtagadva. Token szükséges.'
+      });
     }
 
-    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // Get fresh user data from database
-    const user = await pool.query(
-      'SELECT id, email, first_name, last_name, user_type, is_active FROM users WHERE id = $1',
+    // User adatok lekérése
+    const result = await pool.query(
+      'SELECT id, email, user_type, first_name, last_name FROM users WHERE id = $1 AND is_active = true',
       [decoded.userId]
     );
 
-    if (user.rows.length === 0 || !user.rows[0].is_active) {
-      req.user = null;
-      return next();
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        error: 'Token érvénytelen vagy felhasználó inaktív'
+      });
     }
 
-    // Add user info to request object
-    req.user = user.rows[0];
+    req.user = {
+      userId: result.rows[0].id,
+      email: result.rows[0].email,
+      userType: result.rows[0].user_type,
+      firstName: result.rows[0].first_name,
+      lastName: result.rows[0].last_name
+    };
+
     next();
-
   } catch (error) {
-    req.user = null;
-    next();
-  }
-};
-
-// Required authentication middleware
-const requireAuth = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ 
+    console.error('Auth middleware error:', error);
+    res.status(401).json({
       success: false,
-      error: 'Hozzáférés megtagadva',
-      message: 'JWT token szükséges' 
-    });
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Get fresh user data
-    pool.query(
-      'SELECT id, email, first_name, last_name, user_type, is_active FROM users WHERE id = $1',
-      [decoded.userId]
-    ).then(user => {
-      if (user.rows.length === 0) {
-        return res.status(401).json({ 
-          success: false,
-          error: 'Érvénytelen token',
-          message: 'Felhasználó nem található' 
-        });
-      }
-
-      if (!user.rows[0].is_active) {
-        return res.status(401).json({ 
-          success: false,
-          error: 'Fiók inaktív',
-          message: 'A fiók deaktiválva' 
-        });
-      }
-
-      req.user = user.rows[0];
-      next();
-    }).catch(error => {
-      console.error('Database error in auth:', error);
-      res.status(500).json({ 
-        success: false,
-        error: 'Szerver hiba az autentikáció során' 
-      });
-    });
-
-  } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(403).json({ 
-        success: false,
-        error: 'Érvénytelen token',
-        message: 'JWT token hibás' 
-      });
-    }
-    
-    if (error.name === 'TokenExpiredError') {
-      return res.status(403).json({ 
-        success: false,
-        error: 'Token lejárt',
-        message: 'Kérjük jelentkezzen be újra' 
-      });
-    }
-
-    res.status(500).json({ 
-      success: false,
-      error: 'Szerver hiba az autentikáció során' 
+      error: 'Token érvénytelen'
     });
   }
 };
 
-// Role-based access control
-const requireRole = (roles) => {
+// Role-based access control middleware
+const requireRole = (allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        error: 'Authentikáció szükséges' 
+        error: 'Authentikáció szükséges'
       });
     }
 
-    if (!roles.includes(req.user.user_type)) {
-      return res.status(403).json({ 
+    if (!allowedRoles.includes(req.user.userType)) {
+      return res.status(403).json({
         success: false,
-        error: 'Nincs jogosultsága ehhez a művelethez',
-        required_role: roles,
-        user_role: req.user.user_type
+        error: 'Nincs jogosultságod ehhez a művelethez'
       });
     }
 
@@ -130,8 +68,49 @@ const requireRole = (roles) => {
   };
 };
 
-module.exports = {
-  authenticateToken,
-  requireAuth,
-  requireRole
+// Service Provider middleware
+const requireServiceProvider = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      error: 'Authentikáció szükséges'
+    });
+  }
+
+  if (req.user.userType !== 'service_provider') {
+    return res.status(403).json({
+      success: false,
+      error: 'Csak szolgáltatók férhetnek hozzá ehhez a funkcióhoz'
+    });
+  }
+
+  next();
+};
+
+// Admin middleware
+const requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      error: 'Authentikáció szükséges'
+    });
+  }
+
+  if (req.user.userType !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      error: 'Admin jogosultság szükséges'
+    });
+  }
+
+  next();
+};
+
+// ES Modules export
+export default authenticateToken;
+export { 
+  authenticateToken, 
+  requireRole, 
+  requireServiceProvider, 
+  requireAdmin 
 };

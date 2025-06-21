@@ -1,152 +1,210 @@
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const pool = require('../config/database');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+// backend/routes/auth.js - ES MODULES ÁTÍRÁS
 
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import pool from '../config/database.js';
 
 const router = express.Router();
 
-// Test endpoint
-router.get('/test', (req, res) => {
-  res.json({ 
-    message: 'Auth routes működnek! 🔐',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      register: 'POST /api/auth/register',
-      login: 'POST /api/auth/login',
-      test: 'GET /api/auth/test'
-    }
-  });
-});
+// JWT token létrehozás helper
+const generateToken = (userId, email, userType) => {
+  return jwt.sign(
+    { userId, email, userType },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+};
 
-// Registration endpoint
-router.post('/register', async (req, res) => {
+// Middleware - Token ellenőrzés
+const authenticateToken = async (req, res, next) => {
   try {
-    const { email, password, firstName, lastName, userType, phone } = req.body;
-
-    // Input validation
-    if (!email || !password || !firstName || !lastName || !userType) {
-      return res.status(400).json({
-        error: 'Hiányzó kötelező mezők',
-        required: ['email', 'password', 'firstName', 'lastName', 'userType']
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: 'Hozzáférés megtagadva. Token szükséges.'
       });
     }
 
-    // Email format validation
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // User adatok lekérése
+    const result = await pool.query(
+      'SELECT id, email, user_type, first_name, last_name FROM users WHERE id = $1 AND is_active = true',
+      [decoded.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        error: 'Token érvénytelen vagy felhasználó inaktív'
+      });
+    }
+
+    req.user = {
+      userId: result.rows[0].id,
+      email: result.rows[0].email,
+      userType: result.rows[0].user_type,
+      firstName: result.rows[0].first_name,
+      lastName: result.rows[0].last_name
+    };
+
+    next();
+  } catch (error) {
+    console.error('Auth middleware error:', error);
+    res.status(401).json({
+      success: false,
+      error: 'Token érvénytelen'
+    });
+  }
+};
+
+// REGISTER endpoint
+router.post('/register', async (req, res) => {
+  try {
+    const { email, password, firstName, lastName, userType } = req.body;
+
+    // Input validáció
+    if (!email || !password || !firstName || !lastName || !userType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Minden mező kitöltése kötelező'
+      });
+    }
+
+    if (!['service_provider', 'customer'].includes(userType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Érvénytelen felhasználó típus'
+      });
+    }
+
+    // Email formátum ellenőrzés
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: 'Érvénytelen email formátum' });
+      return res.status(400).json({
+        success: false,
+        error: 'Érvénytelen email formátum'
+      });
     }
 
-    // Password strength validation
+    // Jelszó hossz ellenőrzés
     if (password.length < 6) {
-      return res.status(400).json({ error: 'A jelszó legalább 6 karakter hosszú legyen' });
+      return res.status(400).json({
+        success: false,
+        error: 'A jelszónak legalább 6 karakter hosszúnak kell lennie'
+      });
     }
 
-    // Check if user already exists
+    // Email egyediség ellenőrzés
     const existingUser = await pool.query(
       'SELECT id FROM users WHERE email = $1',
       [email.toLowerCase()]
     );
 
     if (existingUser.rows.length > 0) {
-      return res.status(409).json({ error: 'Ez az email cím már használatban van' });
+      return res.status(409).json({
+        success: false,
+        error: 'Ez az email cím már regisztrálva van'
+      });
     }
 
-    // Hash password
+    // Jelszó hashelés
     const saltRounds = 12;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Insert new user
-    const newUser = await pool.query(
-      `INSERT INTO users (email, password_hash, first_name, last_name, user_type, phone) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
+    // User létrehozás
+    const result = await pool.query(
+      `INSERT INTO users (email, password_hash, first_name, last_name, user_type, is_active, created_at)
+       VALUES ($1, $2, $3, $4, $5, true, CURRENT_TIMESTAMP)
        RETURNING id, email, first_name, last_name, user_type, created_at`,
-      [email.toLowerCase(), passwordHash, firstName, lastName, userType, phone]
+      [email.toLowerCase(), hashedPassword, firstName, lastName, userType]
     );
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { 
-        userId: newUser.rows[0].id,
-        email: newUser.rows[0].email,
-        userType: newUser.rows[0].user_type
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
+    const newUser = result.rows[0];
+
+    // JWT token generálás
+    const token = generateToken(newUser.id, newUser.email, newUser.user_type);
+
+    console.log(`✅ New user registered: ${email} (${userType})`);
 
     res.status(201).json({
+      success: true,
       message: 'Sikeres regisztráció! 🎉',
       user: {
-        id: newUser.rows[0].id,
-        email: newUser.rows[0].email,
-        firstName: newUser.rows[0].first_name,
-        lastName: newUser.rows[0].last_name,
-        userType: newUser.rows[0].user_type,
-        createdAt: newUser.rows[0].created_at
+        id: newUser.id,
+        email: newUser.email,
+        firstName: newUser.first_name,
+        lastName: newUser.last_name,
+        userType: newUser.user_type,
+        createdAt: newUser.created_at
       },
       token
     });
 
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
+      success: false,
       error: 'Szerver hiba a regisztráció során',
       message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
 
-// Login endpoint
+// LOGIN endpoint
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Input validation
+    // Input validáció
     if (!email || !password) {
       return res.status(400).json({
+        success: false,
         error: 'Email és jelszó megadása kötelező'
       });
     }
 
-    // Find user by email
-    const user = await pool.query(
-      'SELECT id, email, password_hash, first_name, last_name, user_type, is_active FROM users WHERE email = $1',
+    // User keresés
+    const result = await pool.query(
+      'SELECT * FROM users WHERE email = $1 AND is_active = true',
       [email.toLowerCase()]
     );
 
-    if (user.rows.length === 0) {
-      return res.status(401).json({ error: 'Érvénytelen email vagy jelszó' });
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        error: 'Hibás email vagy jelszó'
+      });
     }
 
-    const userData = user.rows[0];
+    const userData = result.rows[0];
 
-    // Check if user is active
-    if (!userData.is_active) {
-      return res.status(401).json({ error: 'A fiók inaktív' });
-    }
-
-    // Verify password
+    // Jelszó ellenőrzés
     const isPasswordValid = await bcrypt.compare(password, userData.password_hash);
 
     if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Érvénytelen email vagy jelszó' });
+      return res.status(401).json({
+        success: false,
+        error: 'Hibás email vagy jelszó'
+      });
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { 
-        userId: userData.id,
-        email: userData.email,
-        userType: userData.user_type
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    // Last login frissítés
+    await pool.query(
+      'UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [userData.id]
     );
 
+    // JWT token generálás
+    const token = generateToken(userData.id, userData.email, userData.user_type);
+
+    console.log(`✅ User logged in: ${email} (${userData.user_type})`);
+
     res.json({
+      success: true,
       message: 'Sikeres bejelentkezés! 🚀',
       user: {
         id: userData.id,
@@ -160,28 +218,31 @@ router.post('/login', async (req, res) => {
 
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
+      success: false,
       error: 'Szerver hiba a bejelentkezés során',
       message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
-// EZEKET ADD HOZZÁ A backend/routes/auth.js VÉGÉRE a module.exports elé:
 
-// Get current user profile - Dashboard adatok betöltéséhez
+// PROFILE endpoint - Dashboard adatok
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     
     const userQuery = await pool.query(
       `SELECT id, email, first_name, last_name, user_type, phone, 
-              profile_image_url, is_verified, created_at 
+              is_verified, created_at 
        FROM users WHERE id = $1`,
       [userId]
     );
 
     if (userQuery.rows.length === 0) {
-      return res.status(404).json({ error: 'Felhasználó nem található' });
+      return res.status(404).json({
+        success: false,
+        error: 'Felhasználó nem található'
+      });
     }
 
     const user = userQuery.rows[0];
@@ -193,16 +254,21 @@ router.get('/profile', authenticateToken, async (req, res) => {
         `SELECT 
            COUNT(*) as total_services,
            AVG(rating_average) as avg_rating,
-           COUNT(CASE WHEN is_active = true THEN 1 END) as active_services
+           COUNT(CASE WHEN profile_completed = true THEN 1 END) as completed_profiles
          FROM service_profiles 
          WHERE user_id = $1`,
         [userId]
       );
       
-      serviceStats = statsQuery.rows[0];
+      serviceStats = statsQuery.rows[0] || {
+        total_services: 0,
+        avg_rating: 0,
+        completed_profiles: 0
+      };
     }
 
     res.json({
+      success: true,
       user: {
         id: user.id,
         email: user.email,
@@ -210,7 +276,6 @@ router.get('/profile', authenticateToken, async (req, res) => {
         lastName: user.last_name,
         userType: user.user_type,
         phone: user.phone,
-        profileImage: user.profile_image_url,
         isVerified: user.is_verified,
         createdAt: user.created_at
       },
@@ -219,176 +284,21 @@ router.get('/profile', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('Profile fetch error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
+      success: false,
       error: 'Hiba a profil betöltése során',
-      message: process.env.NODE_ENV === 'development' ? error.message : 'Server error'
+      message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
 
-// Update user profile - Settings oldalhoz
-router.put('/update-profile', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { firstName, lastName, phone } = req.body;
-
-    // Input validation
-    if (!firstName || !lastName) {
-      return res.status(400).json({
-        error: 'Keresztnév és vezetéknév megadása kötelező'
-      });
-    }
-
-    const updatedUser = await pool.query(
-      `UPDATE users 
-       SET first_name = $1, last_name = $2, phone = $3, updated_at = NOW()
-       WHERE id = $4 
-       RETURNING id, email, first_name, last_name, user_type, phone, profile_image_url`,
-      [firstName, lastName, phone, userId]
-    );
-
-    if (updatedUser.rows.length === 0) {
-      return res.status(404).json({ error: 'Felhasználó nem található' });
-    }
-
-    const user = updatedUser.rows[0];
-
-    res.json({
-      message: 'Profil sikeresen frissítve! ✅',
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        userType: user.user_type,
-        phone: user.phone,
-        profileImage: user.profile_image_url
-      }
-    });
-
-  } catch (error) {
-    console.error('Profile update error:', error);
-    res.status(500).json({ 
-      error: 'Hiba a profil frissítése során',
-      message: process.env.NODE_ENV === 'development' ? error.message : 'Server error'
-    });
-  }
+// TEST endpoint
+router.get('/test', authenticateToken, (req, res) => {
+  res.json({
+    success: true,
+    message: 'Auth middleware működik! ✅',
+    user: req.user
+  });
 });
 
-// Dashboard statistics - Role-specifikus adatok
-router.get('/dashboard-stats', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const userType = req.user.userType;
-
-    let stats = {};
-
-    if (userType === 'service_provider') {
-      // Szolgáltató statisztikák
-      const serviceStatsQuery = await pool.query(
-        `SELECT 
-           COUNT(*) as total_services,
-           COUNT(CASE WHEN is_active = true THEN 1 END) as active_services,
-           AVG(rating_average) as avg_rating,
-           COUNT(DISTINCT user_id) as total_reviews
-         FROM service_profiles 
-         WHERE user_id = $1`,
-        [userId]
-      );
-
-      // Havi bevétel (ha van payments tábla)
-      const revenueQuery = await pool.query(
-        `SELECT 
-           COALESCE(SUM(amount), 0) as monthly_revenue,
-           COUNT(*) as completed_projects
-         FROM payments 
-         WHERE service_provider_id = $1 
-           AND status = 'completed' 
-           AND created_at >= date_trunc('month', CURRENT_DATE)`,
-        [userId]
-      );
-
-      stats = {
-        ...serviceStatsQuery.rows[0],
-        ...revenueQuery.rows[0],
-        userType: 'service_provider'
-      };
-
-    } else {
-      // Ügyfél statisztikák
-      const customerStatsQuery = await pool.query(
-        `SELECT 
-           COUNT(*) as total_bookings,
-           COUNT(CASE WHEN status = 'active' THEN 1 END) as active_projects,
-           COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_projects
-         FROM bookings 
-         WHERE customer_id = $1`,
-        [userId]
-      );
-
-      stats = {
-        ...customerStatsQuery.rows[0],
-        userType: 'customer'
-      };
-    }
-
-    res.json({ stats });
-
-  } catch (error) {
-    console.error('Dashboard stats error:', error);
-    // Hibás adatbázis lekérdezés esetén alapértelmezett értékek
-    res.json({ 
-      stats: {
-        total_services: 0,
-        active_services: 0,
-        avg_rating: 0,
-        total_reviews: 0,
-        monthly_revenue: 0,
-        completed_projects: 0,
-        userType: req.user.userType
-      }
-    });
-  }
-});
-// GET /api/auth/profile - Dashboard számára
-router.get('/profile', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    
-    const userQuery = await pool.query(
-      `SELECT id, email, first_name, last_name, user_type, phone, 
-              profile_image_url, is_verified, created_at 
-       FROM users WHERE id = $1`,
-      [userId]
-    );
-
-    if (userQuery.rows.length === 0) {
-      return res.status(404).json({ error: 'Felhasználó nem található' });
-    }
-
-    const user = userQuery.rows[0];
-    
-    res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        userType: user.user_type,
-        phone: user.phone,
-        profileImage: user.profile_image_url,
-        isVerified: user.is_verified,
-        createdAt: user.created_at
-      }
-    });
-
-  } catch (error) {
-    console.error('Profile fetch error:', error);
-    res.status(500).json({ 
-      error: 'Hiba a profil betöltése során'
-    });
-  }
-});
-
-module.exports = router;
-module.exports = router;
+export default router;

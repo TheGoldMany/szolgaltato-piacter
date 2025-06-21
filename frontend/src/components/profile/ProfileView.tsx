@@ -1,32 +1,46 @@
-// frontend/src/components/profile/StandardProfileView.tsx
+// frontend/src/components/profile/ProfileView.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Navbar from '../layout/Navbar';
 
+// ✅ JAVÍTOTT INTERFACE - Backend válasz alapján
 interface ServiceProfile {
   id: number;
   business_name: string;
   description: string;
-  profile_image_url: string;
+  profile_image_url?: string;
+  cover_image_url?: string;
   location_city: string;
-  location_address: string;
-  price_category: 'budget' | 'mid' | 'premium';
-  price_range_min: number;
-  price_range_max: number;
-  contact_phone: string;
-  contact_email: string;
-  availability_hours: string;
-  specializations: string[];
-  user_id: number;
-  user: {
-    first_name: string;
-    last_name: string;
-    email: string;
-  };
+  location_address?: string;
+  price_category?: string;
+  rating_average: number;
+  rating_count: number;
+  website?: string;
+  availability_status?: string;
+  first_name: string;        // ✅ Backend-ből jön
+  last_name: string;         // ✅ Backend-ből jön
+  email: string;             // ✅ Backend-ből jön
+  specializations?: string[];
+  services?: Array<{         // ✅ Backend-ből jön
+    id: number;
+    title: string;
+    description?: string;
+    base_price: number;
+    price_unit: string;
+    category: string;
+  }>;
+  modules?: Array<{
+    module_type: string;
+    position_x: number;
+    position_y: number;
+    width: number;
+    height: number;
+    content: any;
+  }>;
 }
 
-const StandardProfileView: React.FC = () => {
+const ProfileView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -40,11 +54,24 @@ const StandardProfileView: React.FC = () => {
     }
   }, [id]);
 
+  // ✅ JAVÍTOTT fetchProfile FÜGGVÉNY
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/profiles/${id}`);
+      setError(null);
+      
+      // ✅ JAVÍTOTT API ENDPOINT
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      console.log(`🔍 Profil betöltése: ${apiUrl}/api/service-providers/${id}`);
+      
+      const response = await fetch(`${apiUrl}/api/service-providers/${id}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log('📄 Profil adatok:', data);
       
       if (data.success) {
         setProfile(data.data);
@@ -52,6 +79,7 @@ const StandardProfileView: React.FC = () => {
         setError(data.error || 'Profil nem található');
       }
     } catch (err: any) {
+      console.error('❌ Error fetching profile:', err);
       setError(err.message || 'Hiba történt a profil betöltése során');
     } finally {
       setLoading(false);
@@ -72,8 +100,8 @@ const StandardProfileView: React.FC = () => {
     navigate('/messages', { 
       state: { 
         startConversation: {
-          userId: profile?.user_id,
-          userName: profile?.business_name || `${profile?.user.first_name} ${profile?.user.last_name}`,
+          userId: profile?.id,
+          userName: profile?.business_name || `${profile?.first_name} ${profile?.last_name}`,
           profileImage: profile?.profile_image_url
         }
       }
@@ -96,7 +124,6 @@ const StandardProfileView: React.FC = () => {
         preselectedProvider: {
           id: profile?.id,
           name: profile?.business_name,
-          userId: profile?.user_id,
           category: profile?.specializations?.[0],
           profileImage: profile?.profile_image_url
         }
@@ -123,21 +150,35 @@ const StandardProfileView: React.FC = () => {
     });
   };
 
-  const getPriceCategoryText = (category: string) => {
+  const getPriceCategoryText = (category?: string) => {
     switch (category) {
-      case 'budget': return 'Kedvező árak';
-      case 'mid': return 'Közepes árak';
-      case 'premium': return 'Prémium árak';
-      default: return 'Árak egyeztethetők';
+      case 'budget':
+      case 'low':
+        return 'Kedvező árak';
+      case 'mid':
+      case 'medium':
+        return 'Közepes árak';
+      case 'premium':
+      case 'high':
+        return 'Prémium árak';
+      default:
+        return 'Árak egyeztethetők';
     }
   };
 
-  const getPriceCategoryColor = (category: string) => {
+  const getPriceCategoryColor = (category?: string) => {
     switch (category) {
-      case 'budget': return 'bg-green-100 text-green-800';
-      case 'mid': return 'bg-yellow-100 text-yellow-800';
-      case 'premium': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'budget':
+      case 'low':
+        return 'bg-green-100 text-green-800';
+      case 'mid':
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'premium':
+      case 'high':
+        return 'bg-purple-100 text-purple-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -177,6 +218,18 @@ const StandardProfileView: React.FC = () => {
     <div className="min-h-screen bg-gray-50 navbar-padding">
       <Navbar />
       
+      {/* Cover Image */}
+      {profile.cover_image_url && (
+        <div className="relative h-64 bg-gradient-to-r from-blue-600 to-purple-600">
+          <img
+            src={profile.cover_image_url}
+            alt="Cover"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black bg-opacity-30"></div>
+        </div>
+      )}
+      
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <button
@@ -191,7 +244,7 @@ const StandardProfileView: React.FC = () => {
           <div className="lg:col-span-2 space-y-6">
             
             {/* Hero Section */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl text-white p-8">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl text-white p-8 -mt-16 relative z-10">
               <div className="flex items-start gap-6">
                 <div className="w-24 h-24 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-3xl font-bold flex-shrink-0">
                   {profile.profile_image_url ? (
@@ -206,9 +259,23 @@ const StandardProfileView: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <h1 className="text-3xl font-bold mb-2">{profile.business_name}</h1>
+                  <p className="text-blue-100 text-lg mb-2">
+                    👤 {profile.first_name} {profile.last_name}
+                  </p>
                   <p className="text-blue-100 text-lg mb-3">
                     📍 {profile.location_city}
+                    {profile.location_address && `, ${profile.location_address}`}
                   </p>
+                  
+                  {/* Rating */}
+                  {profile.rating_count > 0 && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-yellow-400 text-xl">⭐</span>
+                      <span className="text-lg font-medium">{profile.rating_average.toFixed(1)}</span>
+                      <span className="text-blue-100">({profile.rating_count} értékelés)</span>
+                    </div>
+                  )}
+                  
                   <div className="flex flex-wrap gap-2">
                     {profile.specializations?.map((spec, index) => (
                       <span 
@@ -231,6 +298,34 @@ const StandardProfileView: React.FC = () => {
               </p>
             </div>
 
+            {/* Services */}
+            {profile.services && profile.services.length > 0 && (
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">🛠️ Szolgáltatások</h2>
+                <div className="space-y-4">
+                  {profile.services.map((service, index) => (
+                    <div key={index} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900">{service.title}</h3>
+                        <div className="text-right">
+                          <span className="text-xl font-bold text-blue-600">
+                            {service.base_price?.toLocaleString()} Ft
+                          </span>
+                          <span className="text-gray-500">/{service.price_unit}</span>
+                        </div>
+                      </div>
+                      {service.description && (
+                        <p className="text-gray-700 mb-2">{service.description}</p>
+                      )}
+                      <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                        {service.category}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Price Information */}
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">💰 Árazás</h2>
@@ -238,11 +333,6 @@ const StandardProfileView: React.FC = () => {
                 <span className={`px-4 py-2 rounded-full text-sm font-medium ${getPriceCategoryColor(profile.price_category)}`}>
                   {getPriceCategoryText(profile.price_category)}
                 </span>
-                {profile.price_range_min && profile.price_range_max && (
-                  <span className="text-lg font-semibold text-gray-900">
-                    {profile.price_range_min.toLocaleString()} - {profile.price_range_max.toLocaleString()} Ft
-                  </span>
-                )}
               </div>
               <p className="text-gray-600 text-sm mt-3">
                 Az árak tájékoztató jellegűek. Pontos árajánlatért vedd fel a kapcsolatot!
@@ -261,10 +351,36 @@ const StandardProfileView: React.FC = () => {
             </div>
 
             {/* Availability */}
-            {profile.availability_hours && (
+            {profile.availability_status && (
               <div className="bg-white rounded-xl p-6 shadow-sm">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">🕒 Elérhetőség</h2>
-                <p className="text-gray-700">{profile.availability_hours}</p>
+                <p className="text-gray-700">{profile.availability_status}</p>
+              </div>
+            )}
+
+            {/* Moduláris profil tartalom (ha vannak modulok) */}
+            {profile.modules && profile.modules.length > 0 && (
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">🎯 Profil tartalom</h2>
+                <div className="grid grid-cols-4 gap-4">
+                  {profile.modules.map((module, index) => (
+                    <div
+                      key={index}
+                      className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+                      style={{
+                        gridColumn: `span ${module.width}`,
+                        gridRow: `span ${module.height}`
+                      }}
+                    >
+                      <div className="text-sm font-medium text-gray-600 mb-2">
+                        {module.module_type}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {JSON.stringify(module.content)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -307,25 +423,25 @@ const StandardProfileView: React.FC = () => {
                 📞 Elérhetőségek
               </h3>
               <div className="space-y-3">
-                {profile.contact_phone && (
+                <div className="flex items-center gap-3">
+                  <span className="text-blue-600">📧</span>
+                  <a 
+                    href={`mailto:${profile.email}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    {profile.email}
+                  </a>
+                </div>
+                {profile.website && (
                   <div className="flex items-center gap-3">
-                    <span className="text-blue-600">📱</span>
+                    <span className="text-blue-600">🌐</span>
                     <a 
-                      href={`tel:${profile.contact_phone}`}
+                      href={profile.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="text-blue-600 hover:underline"
                     >
-                      {profile.contact_phone}
-                    </a>
-                  </div>
-                )}
-                {profile.contact_email && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-blue-600">✉️</span>
-                    <a 
-                      href={`mailto:${profile.contact_email}`}
-                      className="text-blue-600 hover:underline"
-                    >
-                      {profile.contact_email}
+                      Weboldal
                     </a>
                   </div>
                 )}
@@ -360,4 +476,4 @@ const StandardProfileView: React.FC = () => {
   );
 };
 
-export default StandardProfileView;
+export default ProfileView;

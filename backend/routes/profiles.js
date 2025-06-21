@@ -1,30 +1,189 @@
-// backend/routes/profiles.js - Frissített standard profil API
-const express = require('express');
-const router = express.Router();
-const pool = require('../config/database');
-const auth = require('../middleware/auth');
+// backend/routes/profiles.js - ES MODULES + MODULÁRIS PROFIL ENDPOINT - JAVÍTOTT
 
-// Profile létrehozás (csak service_provider-ek számára)
-router.post('/', auth, async (req, res) => {
+import express from 'express';
+import pool from '../config/database.js';
+import auth from '../middleware/auth.js';
+
+const router = express.Router();
+
+// ✅ ÚJ! Modulok mentése endpoint
+router.post('/modules', auth, async (req, res) => {
   try {
-    // Ellenőrzés, hogy service_provider-e
     if (req.user.userType !== 'service_provider') {
       return res.status(403).json({
         success: false,
-        error: 'Csak szolgáltatók hozhatnak létre profilt'
+        error: 'Csak szolgáltatók menthetnek modulokat'
       });
     }
 
-    // Ellenőrzés, hogy már van-e profil
-    const existingProfile = await pool.query(
+    const { modules } = req.body;
+
+    if (!Array.isArray(modules)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Modulok array formátumban vártak'
+      });
+    }
+
+    console.log(`📦 ${modules.length} modul mentése felhasználó ${req.user.userId} számára`);
+
+    // Service profile ID lekérése
+    const profileResult = await pool.query(
       'SELECT id FROM service_profiles WHERE user_id = $1',
       [req.user.userId]
     );
 
-    if (existingProfile.rows.length > 0) {
-      return res.status(400).json({
+    if (profileResult.rows.length === 0) {
+      return res.status(404).json({
         success: false,
-        error: 'Már létezik profil ehhez a felhasználóhoz'
+        error: 'Service profil nem található. Először hozz létre alapvető profilt!'
+      });
+    }
+
+    const profileId = profileResult.rows[0].id;
+
+    // Tranzakció indítása
+    await pool.query('BEGIN');
+
+    try {
+      // Régi modulok törlése
+      await pool.query('DELETE FROM profile_modules WHERE profile_id = $1', [profileId]);
+      console.log(`🗑️ Régi modulok törölve profile_id: ${profileId}`);
+
+      // Új modulok beszúrása
+      for (const module of modules) {
+        await pool.query(`
+          INSERT INTO profile_modules (
+            profile_id, uuid, module_type, 
+            position_x, position_y, width, height,
+            content, is_visible, sort_order
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `, [
+          profileId,
+          module.uuid,
+          module.module_type,
+          module.position_x,
+          module.position_y,
+          module.width,
+          module.height,
+          JSON.stringify(module.content),
+          module.is_visible,
+          module.sort_order
+        ]);
+      }
+
+      // Service profile frissítése
+      await pool.query(
+        'UPDATE service_profiles SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+        [profileId]
+      );
+
+      await pool.query('COMMIT');
+      console.log(`✅ ${modules.length} modul sikeresen mentve`);
+
+      res.json({
+        success: true,
+        message: `${modules.length} modul sikeresen elmentve`,
+        data: { 
+          profile_id: profileId,
+          modules_count: modules.length 
+        }
+      });
+
+    } catch (error) {
+      await pool.query('ROLLBACK');
+      throw error;
+    }
+
+  } catch (error) {
+    console.error('Modules save error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Szerver hiba történt a modulok mentése során'
+    });
+  }
+});
+
+// Saját profil lekérése modulokkal - FRISSÍTETT!
+router.get('/me', auth, async (req, res) => {
+  try {
+    if (req.user.userType !== 'service_provider') {
+      return res.status(403).json({
+        success: false,
+        error: 'Csak szolgáltatók férhetnek hozzá profiljukhoz'
+      });
+    }
+
+    // Alapvető profil adatok lekérése
+    const profileResult = await pool.query(`
+      SELECT sp.*, u.first_name, u.last_name, u.email, u.user_type
+      FROM service_profiles sp
+      JOIN users u ON sp.user_id = u.id
+      WHERE sp.user_id = $1
+    `, [req.user.userId]);
+
+    if (profileResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Profil nem található'
+      });
+    }
+
+    const profile = profileResult.rows[0];
+    
+    // Specializations JSON-ből array-ba alakítása
+    profile.specializations = JSON.parse(profile.specializations || '[]');
+
+    // Modulok lekérése
+    const modulesResult = await pool.query(`
+      SELECT 
+        uuid,
+        module_type,
+        position_x,
+        position_y,
+        width,
+        height,
+        content,
+        is_visible,
+        sort_order,
+        created_at,
+        updated_at
+      FROM profile_modules 
+      WHERE profile_id = $1 
+      ORDER BY sort_order ASC, created_at ASC
+    `, [profile.id]);
+
+    // Modulok hozzáadása a profil objektumhoz
+    profile.modules = modulesResult.rows.map(module => ({
+      ...module,
+      content: typeof module.content === 'string' 
+        ? JSON.parse(module.content) 
+        : module.content
+    }));
+
+    console.log(`📥 Profil betöltve ${modulesResult.rows.length} modullal`);
+
+    res.json({
+      success: true,
+      data: profile
+    });
+
+  } catch (error) {
+    console.error('Get profile with modules error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Szerver hiba történt a profil lekérése során'
+    });
+  }
+});
+
+// Profil létrehozása
+router.post('/', auth, async (req, res) => {
+  try {
+    if (req.user.userType !== 'service_provider') {
+      return res.status(403).json({
+        success: false,
+        error: 'Csak szolgáltatók hozhatnak létre profilt'
       });
     }
 
@@ -51,21 +210,25 @@ router.post('/', auth, async (req, res) => {
       });
     }
 
-    if (!contact_phone && !contact_email) {
-      return res.status(400).json({
+    // Ellenőrizzük, hogy már van-e profilja
+    const existingProfile = await pool.query(
+      'SELECT id FROM service_profiles WHERE user_id = $1',
+      [req.user.userId]
+    );
+
+    if (existingProfile.rows.length > 0) {
+      return res.status(409).json({
         success: false,
-        error: 'Legalább egy elérhetőség megadása kötelező'
+        error: 'Már van aktív profilod. Használd a PUT /me endpoint-ot a frissítéshez.'
       });
     }
 
-    // Profil létrehozása
     const result = await pool.query(
       `INSERT INTO service_profiles (
         user_id, business_name, description, location_city, location_address,
-        price_category, price_range_min, price_range_max, contact_phone,
-        contact_email, availability_hours, specializations, profile_image_url,
-        created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+        price_category, price_range_min, price_range_max, contact_phone, contact_email,
+        availability_hours, specializations, profile_image_url, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING *`,
       [
         req.user.userId,
@@ -104,50 +267,6 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// Saját profil lekérése
-router.get('/me', auth, async (req, res) => {
-  try {
-    if (req.user.userType !== 'service_provider') {
-      return res.status(403).json({
-        success: false,
-        error: 'Csak szolgáltatók férhetnek hozzá profiljukhoz'
-      });
-    }
-
-    const result = await pool.query(
-      `SELECT sp.*, u.first_name, u.last_name, u.email, u.user_type
-       FROM service_profiles sp
-       JOIN users u ON sp.user_id = u.id
-       WHERE sp.user_id = $1`,
-      [req.user.userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Profil nem található'
-      });
-    }
-
-    const profile = result.rows[0];
-    
-    // Specializations JSON-ből array-ba alakítása
-    profile.specializations = JSON.parse(profile.specializations || '[]');
-
-    res.json({
-      success: true,
-      data: profile
-    });
-
-  } catch (error) {
-    console.error('Get profile error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Szerver hiba történt a profil lekérése során'
-    });
-  }
-});
-
 // Profil frissítése
 router.put('/me', auth, async (req, res) => {
   try {
@@ -181,33 +300,24 @@ router.put('/me', auth, async (req, res) => {
       });
     }
 
-    if (!contact_phone && !contact_email) {
-      return res.status(400).json({
-        success: false,
-        error: 'Legalább egy elérhetőség megadása kötelező'
-      });
-    }
-
-    // Profil frissítése
     const result = await pool.query(
       `UPDATE service_profiles SET
-        business_name = $2,
-        description = $3,
-        location_city = $4,
-        location_address = $5,
-        price_category = $6,
-        price_range_min = $7,
-        price_range_max = $8,
-        contact_phone = $9,
-        contact_email = $10,
-        availability_hours = $11,
-        specializations = $12,
-        profile_image_url = $13,
-        updated_at = NOW()
-       WHERE user_id = $1
-       RETURNING *`,
+        business_name = $1,
+        description = $2,
+        location_city = $3,
+        location_address = $4,
+        price_category = $5,
+        price_range_min = $6,
+        price_range_max = $7,
+        contact_phone = $8,
+        contact_email = $9,
+        availability_hours = $10,
+        specializations = $11,
+        profile_image_url = $12,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = $13
+      RETURNING *`,
       [
-        req.user.userId,
         business_name,
         description,
         location_city,
@@ -219,7 +329,8 @@ router.put('/me', auth, async (req, res) => {
         contact_email || null,
         availability_hours || null,
         JSON.stringify(specializations || []),
-        profile_image_url || null
+        profile_image_url || null,
+        req.user.userId
       ]
     );
 
@@ -231,8 +342,6 @@ router.put('/me', auth, async (req, res) => {
     }
 
     const profile = result.rows[0];
-    
-    // Specializations JSON-ből array-ba alakítása
     profile.specializations = JSON.parse(profile.specializations || '[]');
 
     res.json({
@@ -250,171 +359,64 @@ router.put('/me', auth, async (req, res) => {
   }
 });
 
-// Publikus profil keresés és listázás
-router.get('/search', async (req, res) => {
+// Publikus profil lekérése modulokkal
+router.get('/public/:profileId', async (req, res) => {
   try {
-    const {
-      query = '',
-      city = '',
-      price_category = '',
-      specialization = '',
-      page = 1,
-      limit = 12
-    } = req.query;
+    const { profileId } = req.params;
 
-    const offset = (page - 1) * limit;
-    
-    let whereConditions = [];
-    let queryParams = [];
-    let paramIndex = 1;
-
-    // Szöveges keresés
-    if (query.trim()) {
-      whereConditions.push(`(
-        sp.business_name ILIKE $${paramIndex} OR 
-        sp.description ILIKE $${paramIndex} OR
-        sp.specializations::text ILIKE $${paramIndex}
-      )`);
-      queryParams.push(`%${query.trim()}%`);
-      paramIndex++;
-    }
-
-    // Város szűrés
-    if (city.trim()) {
-      whereConditions.push(`sp.location_city ILIKE $${paramIndex}`);
-      queryParams.push(`%${city.trim()}%`);
-      paramIndex++;
-    }
-
-    // Árkategória szűrés
-    if (price_category && ['budget', 'mid', 'premium'].includes(price_category)) {
-      whereConditions.push(`sp.price_category = $${paramIndex}`);
-      queryParams.push(price_category);
-      paramIndex++;
-    }
-
-    // Szakterület szűrés
-    if (specialization.trim()) {
-      whereConditions.push(`sp.specializations::text ILIKE $${paramIndex}`);
-      queryParams.push(`%${specialization.trim()}%`);
-      paramIndex++;
-    }
-
-    const whereClause = whereConditions.length > 0 
-      ? `WHERE ${whereConditions.join(' AND ')}` 
-      : '';
-
-    // Főlekérdezés
-    const profilesQuery = `
-      SELECT sp.*, u.first_name, u.last_name, u.email
+    // Profil alapadatok lekérése
+    const profileResult = await pool.query(`
+      SELECT 
+        sp.*,
+        u.first_name,
+        u.last_name
       FROM service_profiles sp
       JOIN users u ON sp.user_id = u.id
-      ${whereClause}
-      ORDER BY sp.updated_at DESC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `;
+      WHERE sp.id = $1 AND sp.is_active = true
+    `, [profileId]);
+
+    if (profileResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Profil nem található vagy inaktív'
+      });
+    }
+
+    const profile = profileResult.rows[0];
     
-    queryParams.push(parseInt(limit), offset);
+    // Specializations feldolgozása
+    profile.specializations = JSON.parse(profile.specializations || '[]');
 
-    const profiles = await pool.query(profilesQuery, queryParams);
+    // Csak látható modulok lekérése
+    const modulesResult = await pool.query(`
+      SELECT 
+        uuid,
+        module_type,
+        position_x,
+        position_y,
+        width,
+        height,
+        content,
+        sort_order
+      FROM profile_modules 
+      WHERE profile_id = $1 AND is_visible = true
+      ORDER BY sort_order ASC, created_at ASC
+    `, [profile.id]);
 
-    // Találatok számának lekérdezése
-    const countQuery = `
-      SELECT COUNT(*) as total
-      FROM service_profiles sp
-      JOIN users u ON sp.user_id = u.id
-      ${whereClause}
-    `;
-    
-    const countResult = await pool.query(countQuery, queryParams.slice(0, -2));
-    const total = parseInt(countResult.rows[0].total);
-
-    // Specializations JSON-ből array-ba alakítása minden profilnál
-    const processedProfiles = profiles.rows.map(profile => ({
-      ...profile,
-      specializations: JSON.parse(profile.specializations || '[]')
+    profile.modules = modulesResult.rows.map(module => ({
+      ...module,
+      content: typeof module.content === 'string' 
+        ? JSON.parse(module.content) 
+        : module.content
     }));
 
     res.json({
       success: true,
-      data: processedProfiles,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit)
-      },
-      filters: {
-        query,
-        city,
-        price_category,
-        specialization
-      }
+      data: profile
     });
 
   } catch (error) {
-    console.error('Profile search error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Szerver hiba történt a keresés során'
-    });
-  }
-});
-
-// Konkrét profil lekérése ID alapján (publikus)
-router.get('/:id', async (req, res) => {
-  try {
-    const profileId = parseInt(req.params.id);
-
-    if (isNaN(profileId)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Érvénytelen profil ID'
-      });
-    }
-
-    const result = await pool.query(
-      `SELECT sp.*, u.first_name, u.last_name, u.email
-       FROM service_profiles sp
-       JOIN users u ON sp.user_id = u.id
-       WHERE sp.id = $1`,
-      [profileId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Profil nem található'
-      });
-    }
-
-    const profile = result.rows[0];
-    
-    // Specializations JSON-ből array-ba alakítása
-    profile.specializations = JSON.parse(profile.specializations || '[]');
-
-    // User objektum létrehozása a response-hoz
-    const responseProfile = {
-      ...profile,
-      user: {
-        first_name: profile.first_name,
-        last_name: profile.last_name,
-        email: profile.email
-      }
-    };
-
-    // User mezők eltávolítása a főszintről
-    delete responseProfile.first_name;
-    delete responseProfile.last_name;
-    delete responseProfile.email;
-
-    res.json({
-      success: true,
-      data: responseProfile
-    });
-
-  } catch (error) {
-    console.error('Get profile by ID error:', error);
+    console.error('Get public profile error:', error);
     res.status(500).json({
       success: false,
       error: 'Szerver hiba történt a profil lekérése során'
@@ -422,7 +424,115 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Profil törlése (csak saját profil)
+// Publikus profil keresés - JAVÍTOTT SQL
+router.get('/search', async (req, res) => {
+  try {
+    const { 
+      query = '', 
+      category = '', 
+      city = '', 
+      price_category = '',
+      page = 1, 
+      limit = 12 
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+
+    let whereConditions = ['sp.is_active = true'];
+    let queryParams = [];
+    let paramCount = 0;
+
+    // Search query
+    if (query) {
+      paramCount++;
+      whereConditions.push(`(
+        sp.business_name ILIKE $${paramCount} OR 
+        sp.description ILIKE $${paramCount} OR
+        u.first_name ILIKE $${paramCount} OR
+        u.last_name ILIKE $${paramCount}
+      )`);
+      queryParams.push(`%${query}%`);
+    }
+
+    // City filter
+    if (city) {
+      paramCount++;
+      whereConditions.push(`sp.location_city ILIKE $${paramCount}`);
+      queryParams.push(`%${city}%`);
+    }
+
+    // Price category filter
+    if (price_category) {
+      paramCount++;
+      whereConditions.push(`sp.price_category = $${paramCount}`);
+      queryParams.push(price_category);
+    }
+
+    // Add limit and offset
+    paramCount++;
+    const limitParam = paramCount;
+    queryParams.push(limit);
+    
+    paramCount++;
+    const offsetParam = paramCount;
+    queryParams.push(offset);
+
+    const searchQuery = `
+      SELECT 
+        sp.id,
+        sp.business_name,
+        sp.description,
+        sp.location_city,
+        sp.price_category,
+        sp.rating_average,
+        sp.rating_count,
+        sp.profile_image_url,
+        u.first_name,
+        u.last_name,
+        sp.created_at
+      FROM service_profiles sp
+      JOIN users u ON sp.user_id = u.id
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY sp.rating_average DESC, sp.created_at DESC
+      LIMIT $${limitParam} OFFSET $${offsetParam}
+    `;
+
+    const result = await pool.query(searchQuery, queryParams);
+
+    // Total count lekérése
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM service_profiles sp
+      JOIN users u ON sp.user_id = u.id
+      WHERE ${whereConditions.join(' AND ')}
+    `;
+
+    const countResult = await pool.query(countQuery, queryParams.slice(0, -2));
+    const total = parseInt(countResult.rows[0].total);
+
+    res.json({
+      success: true,
+      data: {
+        profiles: result.rows,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Search profiles error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Szerver hiba történt a keresés során'
+    });
+  }
+});
+
+// Profil törlése
 router.delete('/me', auth, async (req, res) => {
   try {
     if (req.user.userType !== 'service_provider') {
@@ -450,7 +560,7 @@ router.delete('/me', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete profile error:', error);
+    console.error('Profile deletion error:', error);
     res.status(500).json({
       success: false,
       error: 'Szerver hiba történt a profil törlése során'
@@ -458,129 +568,4 @@ router.delete('/me', auth, async (req, res) => {
   }
 });
 
-// Profil statisztikák (admin/analytics célokra)
-router.get('/stats/overview', auth, async (req, res) => {
-  try {
-    // Csak service_provider-ek férhetnek hozzá saját statisztikáikhoz
-    if (req.user.userType !== 'service_provider') {
-      return res.status(403).json({
-        success: false,
-        error: 'Nincs jogosultság a statisztikák megtekintéséhez'
-      });
-    }
-
-    const profileResult = await pool.query(
-      'SELECT id, created_at, updated_at FROM service_profiles WHERE user_id = $1',
-      [req.user.userId]
-    );
-
-    if (profileResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Profil nem található'
-      });
-    }
-
-    const profile = profileResult.rows[0];
-
-    // Itt később hozzáadhatjuk a valós statisztikákat:
-    // - profil megtekintések száma
-    // - kapcsolatfelvételek száma
-    // - projektek száma
-    // - értékelések átlaga
-
-    const stats = {
-      profile_id: profile.id,
-      created_at: profile.created_at,
-      last_updated: profile.updated_at,
-      days_active: Math.floor((new Date() - new Date(profile.created_at)) / (1000 * 60 * 60 * 24)),
-      // Placeholder értékek - később cseréljük le valós adatokra
-      views: 0,
-      contacts: 0,
-      projects: 0,
-      rating: 0
-    };
-
-    res.json({
-      success: true,
-      data: stats
-    });
-
-  } catch (error) {
-    console.error('Get profile stats error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Szerver hiba történt a statisztikák lekérése során'
-    });
-  }
-});
-
-// Kategóriák és szakterületek lekérése (segítség a form kitöltéséhez)
-router.get('/helpers/categories', async (req, res) => {
-  try {
-    // Népszerű szakterületek lekérése a meglévő profilokból
-    const specializationsResult = await pool.query(`
-      SELECT unnest(
-        array_agg(
-          DISTINCT jsonb_array_elements_text(specializations::jsonb)
-        )
-      ) as specialization
-      FROM service_profiles
-      WHERE specializations IS NOT NULL 
-      AND specializations != '[]'
-      AND specializations != 'null'
-    `);
-
-    const popularSpecializations = specializationsResult.rows
-      .map(row => row.specialization)
-      .filter(spec => spec && spec.trim())
-      .slice(0, 20); // Top 20 legnépszerűbb
-
-    // Népszerű városok
-    const citiesResult = await pool.query(`
-      SELECT location_city, COUNT(*) as count
-      FROM service_profiles
-      WHERE location_city IS NOT NULL AND location_city != ''
-      GROUP BY location_city
-      ORDER BY count DESC
-      LIMIT 20
-    `);
-
-    const popularCities = citiesResult.rows.map(row => row.location_city);
-
-    // Árkategóriák statisztikája
-    const priceCategoriesResult = await pool.query(`
-      SELECT price_category, COUNT(*) as count
-      FROM service_profiles
-      WHERE price_category IS NOT NULL
-      GROUP BY price_category
-      ORDER BY count DESC
-    `);
-
-    const priceCategories = priceCategoriesResult.rows;
-
-    res.json({
-      success: true,
-      data: {
-        popular_specializations: popularSpecializations,
-        popular_cities: popularCities,
-        price_categories: priceCategories,
-        suggested_specializations: [
-          'Vízvezeték szerelés', 'Villanyszerelés', 'Festés', 'Burkolás',
-          'Kertészet', 'Takarítás', 'Webfejlesztés', 'Grafikai tervezés',
-          'Fordítás', 'Könyvelés', 'Jogi tanácsadás', 'Masszázs',
-          'Fotózás', 'Catering', 'Autószerelés', 'Informatikai support'
-        ]
-      }
-    });
-
-  } catch (error) {
-    console.error('Get categories error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Szerver hiba történt a kategóriák lekérése során'
-    });
-  }
-});
-
-module.exports = router;
+export default router;

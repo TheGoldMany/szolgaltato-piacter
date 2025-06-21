@@ -1,5 +1,9 @@
-const { Pool } = require('pg');
-require('dotenv').config();
+// backend/config/database.js - ES MODULES ÁTÍRÁS
+import { Pool } from 'pg';
+import { config } from 'dotenv';
+
+// Environment változók betöltése
+config();
 
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
@@ -21,4 +25,23 @@ pool.on('error', (err) => {
   console.error('❌ PostgreSQL kapcsolat hiba:', err);
 });
 
-module.exports = pool;
+// Connection health check
+export const testConnection = async () => {
+  try {
+    const result = await pool.query('SELECT version(), now()');
+    console.log('✅ PostgreSQL connection OK');
+    console.log('Version:', result.rows[0].version.split(' ')[0] + ' ' + result.rows[0].version.split(' ')[1]);
+    console.log('Time:', result.rows[0].now);
+    return true;
+  } catch (error) {
+    console.error('❌ Connection failed:', error.message);
+    console.log('Config check:');
+    console.log('- HOST:', process.env.DB_HOST || 'localhost');
+    console.log('- PORT:', process.env.DB_PORT || 5432);
+    console.log('- DATABASE:', process.env.DB_NAME || 'szolgaltato_piacter_dev');
+    console.log('- USER:', process.env.DB_USER || 'postgres');
+    return false;
+  }
+};
+
+export default pool;

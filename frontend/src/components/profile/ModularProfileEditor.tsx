@@ -506,31 +506,52 @@ const ModularProfileEditor: React.FC = () => {
     }
   };
 
-  const saveModules = async () => {
+// TELJES saveModules javítás:
+const saveModules = async () => {
   setIsLoading(true);
   try {
-    console.log('🚀 Mentés indítása, modulok:', modules);
+    // Backend formátumra konvertálás
+    const backendModules = modules.map(module => ({
+      uuid: module.id,                    // Frontend ID -> uuid mezőbe
+      module_type: module.type,
+      position_x: module.position.x,
+      position_y: module.position.y,
+      width: module.position.width,       // ← width mező használata
+      height: module.position.height,     // ← height mező használata
+      content: module.content,
+      is_visible: module.isVisible,
+      sort_order: module.sortOrder
+    }));
+
+    console.log('🚀 Mentés indítása, backend modulok:', backendModules);
     
-    const response = await fetch('http://localhost:5000/api/users/profiles/modules', {  // ✅ TELJES URL
+    const response = await fetch('http://localhost:5000/api/users/profiles/modules', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${localStorage.getItem('authToken')}`
       },
-      body: JSON.stringify({ modules })
+      body: JSON.stringify({ modules: backendModules }) // ← Backend formátum küldése
     });
 
-    console.log('📡 Response status:', response.status);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
     const data = await response.json();
     console.log('📦 Response data:', data);
     
     if (data.success) {
       alert('✅ Modulok sikeresen elmentve!');
+      if (data.data?.profile_id) {
+        setUserProfileId(data.data.profile_id);
+      }
     } else {
-      alert('❌ Hiba: ' + (data.error || 'Ismeretlen hiba'));
+      throw new Error(data.error || 'Ismeretlen hiba');
     }
   } catch (error) {
-    console.error('❌ Fetch error:', error);
+    console.error('❌ Save error:', error);
     alert('❌ Hiba történt a mentés során: ' + error);
   } finally {
     setIsLoading(false);
@@ -557,8 +578,8 @@ const loadExistingModules = async () => {
         position: {
           x: backendModule.position_x,
           y: backendModule.position_y,
-          width: backendModule.position_width,
-          height: backendModule.position_height
+          width: backendModule.width,        // ← Változtatás: position_width helyett width
+          height: backendModule.height
         },
         content: backendModule.content,
         isVisible: backendModule.is_visible,

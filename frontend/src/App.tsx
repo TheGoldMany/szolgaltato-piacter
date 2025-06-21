@@ -7,7 +7,7 @@ import RegisterForm from './components/auth/RegisterForm';
 import Dashboard from './pages/Dashboard';
 import HomePage from './pages/HomePage';
 import ProfileEditor from './components/profile/ProfileEditor'; 
-import { ProfileView } from './components/profile';
+import ProfileView from './components/profile/ProfileView';  // ProfileView.tsx-t keres
 import ServiceProviders from './pages/ServiceProviders';
 import ModularProfileEditor from './components/profile/ModularProfileEditor';
 import ProjectManager from './pages/ProjectManager';
