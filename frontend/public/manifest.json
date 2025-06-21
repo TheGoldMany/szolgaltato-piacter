@@ -1,25 +1,46 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Corvus",
+  "name": "Corvus - Szolgáltató Piactér",
+  "description": "Magyarország vezető szolgáltató piactere. Találd meg a legjobb szakembereket vagy hirdess szolgáltatásokat.",
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "corvus-favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
     },
     {
-      "src": "logo192.png",
+      "src": "corvus-logo-192.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "logo512.png",
-      "type": "image/png",
+      "src": "corvus-logo-512.png",
+      "type": "image/png", 
       "sizes": "512x512"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#2c3e50",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity", "shopping"],
+  "lang": "hu",
+  "scope": "/",
+  "shortcuts": [
+    {
+      "name": "Szolgáltatók böngészése",
+      "short_name": "Böngészés",
+      "description": "Keress szolgáltatók között",
+      "url": "/browse",
+      "icons": [{ "src": "corvus-logo-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "AI Asszisztens",
+      "short_name": "AI Chat",
+      "description": "Beszélj az AI asszisztenssel",
+      "url": "/ai-chat",
+      "icons": [{ "src": "corvus-logo-192.png", "sizes": "192x192" }]
+    }
+  ]
 }

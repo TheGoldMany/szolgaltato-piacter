@@ -220,38 +220,67 @@ const Navbar: React.FC = () => {
                 e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
+              {/* ✅ CORVUS LOGO KÉP - NAGYOBB MÉRET */}
+<img 
+  src="/corvus-logo-crop.png"  // ✅ JAVÍTOTT: Absolute path a public mappához
+  alt="Corvus Logo" 
+  style={{
+    height: window.innerWidth < 640 ? '48px' : (isScrolled ? '44px' : '52px'), // ✅ Megnövelve
+    width: 'auto',
+    transition: 'all 0.3s ease'
+  }}
+  onError={(e) => {
+    // Fallback ha nincs logo fájl - visszatérés az eredeti dizájnhoz
+    const target = e.target as HTMLImageElement;
+    target.style.display = 'none';
+    const fallback = target.nextElementSibling as HTMLElement;
+    if (fallback) {
+      fallback.style.display = 'flex';
+    }
+  }}
+/>
+              
+              {/* Fallback logo (ha nincs kép fájl) */}
               <div 
                 style={{
-                  width: window.innerWidth < 640 ? '36px' : (isScrolled ? '40px' : '48px'),
-                  height: window.innerWidth < 640 ? '36px' : (isScrolled ? '40px' : '48px'),
-                  background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
-                  borderRadius: '12px',
-                  display: 'flex',
+                  display: 'none', // Alapértelmezetten elrejtve, csak error esetén jelenik meg
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: window.innerWidth < 640 ? '18px' : (isScrolled ? '20px' : '24px'),
-                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
-                  transition: 'all 0.3s ease'
+                  gap: window.innerWidth < 640 ? '8px' : '16px'
                 }}
               >
-                🎯
-              </div>
-              <span 
-                style={{
-                  fontSize: window.innerWidth < 640 ? '20px' : (isScrolled ? '24px' : '28px'),
-                  fontWeight: '800',
-                  background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
-                  WebkitBackgroundClip: 'text',
-                  backgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  letterSpacing: '-0.5px',
-                  transition: 'font-size 0.3s ease',
-                  display: window.innerWidth < 480 ? 'none' : 'block'
-                }}
-              >
-                Corvus
-              </span>
-            </button>
+                <div 
+                  style={{
+                    width: window.innerWidth < 640 ? '36px' : (isScrolled ? '40px' : '48px'),
+                    height: window.innerWidth < 640 ? '36px' : (isScrolled ? '40px' : '48px'),
+                    background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: window.innerWidth < 640 ? '18px' : (isScrolled ? '20px' : '24px'),
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  🎯
+            </div>
+                <span 
+                  style={{
+                    fontSize: window.innerWidth < 640 ? '20px' : (isScrolled ? '24px' : '28px'),
+                    fontWeight: '800',
+                    background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+                    WebkitBackgroundClip: 'text',
+                    backgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    letterSpacing: '-0.5px',
+                    transition: 'font-size 0.3s ease',
+                    display: window.innerWidth < 480 ? 'none' : 'block'
+                  }}
+                >
+                  Corvus
+                </span>
+                </div>
+           </button>
           </div>
 
           {/* Desktop Navigation Links - KÖZÉP */}

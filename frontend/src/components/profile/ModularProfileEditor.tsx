@@ -4,6 +4,8 @@ import Container from '../layout/Container';
 import Card from '../common/Card';
 import { useAuth } from '../../context/AuthContext'; // ← Ez hiányzott!
 import Navbar from '../layout/Navbar';
+import { profileService } from '../../services/profileService';
+
 // Types
 interface GridPosition {
   x: number;
@@ -204,6 +206,7 @@ const ModularProfileEditor: React.FC = () => {
   }, [isPositionOccupied]);
 
   // Get default content
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const getDefaultContent = (type: ModuleType) => {
     switch (type) {
       case 'hero':
@@ -507,93 +510,112 @@ const ModularProfileEditor: React.FC = () => {
   };
 
 // TELJES saveModules javítás:
-const saveModules = async () => {
+const loadExistingModules = async () => {
   setIsLoading(true);
   try {
-    // Backend formátumra konvertálás
-    const backendModules = modules.map(module => ({
-      uuid: module.id,                    // Frontend ID -> uuid mezőbe
-      module_type: module.type,
-      position_x: module.position.x,
-      position_y: module.position.y,
-      width: module.position.width,       // ← width mező használata
-      height: module.position.height,     // ← height mező használata
-      content: module.content,
-      is_visible: module.isVisible,
-      sort_order: module.sortOrder
-    }));
-
-    console.log('🚀 Mentés indítása, backend modulok:', backendModules);
+    console.log('📥 Modulok betöltése...');
     
-    const response = await fetch('http://localhost:5000/api/users/profiles/modules', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      },
-      body: JSON.stringify({ modules: backendModules }) // ← Backend formátum küldése
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log('📦 Response data:', data);
+    const { profile, modules: backendModules } = await profileService.getMyProfileWithModules();
     
-    if (data.success) {
-      alert('✅ Modulok sikeresen elmentve!');
-      if (data.data?.profile_id) {
-        setUserProfileId(data.data.profile_id);
+    console.log('📦 Backend modulok:', backendModules);
+    
+    if (backendModules && backendModules.length > 0) {
+      // Backend -> Frontend formátum konvertálás
+      const convertedModules: ModuleData[] = backendModules.map((backendModule: any) => ({
+        id: backendModule.uuid || `module-${Date.now()}-${Math.random()}`,
+        type: backendModule.module_type,
+        position: {
+          x: backendModule.position_x || 0,
+          y: backendModule.position_y || 0,
+          width: backendModule.width || 1,
+          height: backendModule.height || 1
+        },
+        content: typeof backendModule.content === 'string' 
+          ? JSON.parse(backendModule.content) 
+          : backendModule.content || {},
+        isVisible: backendModule.is_visible ?? true,
+        sortOrder: backendModule.sort_order || 0
+      }));
+      
+      console.log('✅ Konvertált modulok:', convertedModules);
+      setModules(convertedModules);
+      
+      // Profile ID mentése preview-hoz
+      if (profile?.id) {
+        setUserProfileId(profile.id);
       }
     } else {
-      throw new Error(data.error || 'Ismeretlen hiba');
+      console.log('📝 Nincs mentett modul, üres profil');
+      setModules([]);
     }
   } catch (error) {
-    console.error('❌ Save error:', error);
-    alert('❌ Hiba történt a mentés során: ' + error);
+    console.error('❌ Modulok betöltési hiba:', error);
+    // Don't show error for empty profile - it's normal for new users
+    if (error || 'not found') {
+      console.log('ℹ️ Új felhasználó - nincs még profil');
+      setModules([]);
+    } else {
+      alert('Hiba történt a modulok betöltése során. Próbáld újra!');
+    }
   } finally {
     setIsLoading(false);
   }
 };
 
-// Load existing modules on component mount
-const loadExistingModules = async () => {
-  try {
-    const response = await fetch('http://localhost:5000/api/users/profiles/me', {  // ✅ TELJES URL
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
-    });
-
-    const data = await response.json();
-    console.log('📥 Loaded profile data:', data);
-    
-    if (data.success && data.data?.modules) {
-      // Convert backend module format to frontend format
-      const convertedModules: ModuleData[] = data.data.modules.map((backendModule: any) => ({
-        id: backendModule.module_id,
-        type: backendModule.module_type,
-        position: {
-          x: backendModule.position_x,
-          y: backendModule.position_y,
-          width: backendModule.width,        // ← Változtatás: position_width helyett width
-          height: backendModule.height
-        },
-        content: backendModule.content,
-        isVisible: backendModule.is_visible,
-        sortOrder: backendModule.sort_order
-      }));
-      
-      console.log('📦 Converted modules:', convertedModules);
-      setModules(convertedModules);
-    }
-  } catch (error) {
-    console.error('❌ Error loading modules:', error);
+// Modulok mentése backend-re
+const saveModules = async () => {
+  if (modules.length === 0) {
+    alert('Nincs modul a mentéshez!');
+    return;
   }
-};
 
+  setIsLoading(true);
+  try {
+    console.log('🚀 Modulok mentése...', modules.length, 'db modul');
+    
+    const result = await profileService.saveModules(modules);
+    
+    console.log('✅ Mentés sikeres:', result);
+    
+    // Success feedback
+    alert(`✅ ${modules.length} modul sikeresen elmentve!`);
+    
+    // Update profile ID for preview
+    if (result.data?.profile_id) {
+      setUserProfileId(result.data.profile_id);
+    }
+    
+  } catch (error) {
+  console.error('❌ Mentési hiba:', error);
+  
+  // ✅ Type-safe error message extraction
+  const getErrorMsg = (err: unknown): string => {
+    if (err instanceof Error) return err.message;
+    if (typeof err === 'string') return err;
+    if (err && typeof err === 'object' && 'message' in err) {
+      return String((err as any).message);
+    }
+    return 'Ismeretlen hiba történt';
+  };
+  
+  const originalError = getErrorMsg(error);
+  let errorMessage = 'Ismeretlen hiba történt a mentés során.';
+  
+  if (originalError.includes('404')) {
+    errorMessage = 'Először hozz létre alapvető profilt a Profile Editor-ban!';
+  } else if (originalError.includes('403')) {
+    errorMessage = 'Nincs jogosultságod modulok mentéséhez. Csak szolgáltatók használhatják.';
+  } else if (originalError.includes('400')) {
+    errorMessage = 'Hibás modul adatok. Ellenőrizd a modulok tartalmát!';
+  } else if (originalError) {
+    errorMessage = originalError;
+  }
+  
+  alert(`❌ Mentési hiba: ${errorMessage}`);
+} finally {
+  setIsLoading(false);
+}
+}
 // Add this useEffect to load existing modules
 useEffect(() => {
   loadExistingModules();

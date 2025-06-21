@@ -66,10 +66,31 @@ export const profileService = {
     const response = await api.get(`/users/profiles/public/${id}`);
     return response.data.data;
   },
+   // ✅ ÚJ! Modulok betöltése
+  getMyProfileWithModules: async (): Promise<{ profile: Profile, modules: any[] }> => {
+    const response = await api.get('/users/profiles/me');
+    return {
+      profile: response.data.data,
+      modules: response.data.data.modules || []
+    };
+  },
+  // ✅ ÚJ! Modulok mentése
+  saveModules: async (modules: any[]): Promise<any> => {
+    const backendModules = modules.map(module => ({
+      uuid: module.id,
+      module_type: module.type,
+      position_x: module.position.x,
+      position_y: module.position.y,
+      width: module.position.width,
+      height: module.position.height,
+      content: module.content,
+      is_visible: module.isVisible ?? true,
+      sort_order: module.sortOrder ?? 0
+    }));
 
-  // ÚJ! Modulok mentése
-  saveModules: async (modules: any[]) => {
-    const response = await api.post('/users/profiles/modules', { modules });
+    const response = await api.post('/users/profiles/modules', { 
+      modules: backendModules 
+    });
     return response.data;
   }
 };
