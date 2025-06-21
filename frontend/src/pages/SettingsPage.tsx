@@ -118,120 +118,123 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setMessage({ type: 'error', text: 'A kép mérete ne legyen nagyobb 5MB-nál' });
-      return;
-    }
+  // Validate file size (max 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    setMessage({ type: 'error', text: 'A kép mérete ne legyen nagyobb 5MB-nál' });
+    return;
+  }
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setMessage({ type: 'error', text: 'Csak képfájlok engedélyezettek' });
-      return;
-    }
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    setMessage({ type: 'error', text: 'Csak képfájlok engedélyezettek' });
+    return;
+  }
 
-    setIsUploading(true);
-    setMessage(null);
+  setIsUploading(true);
+  setMessage(null);
 
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
+  try {
+    const formData = new FormData();
+    formData.append('image', file);
 
-      const response = await fetch('/api/upload/profile-image', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        },
-        body: formData
-      });
+    // ✅ JAVÍTOTT: API URL környezeti változóból
+    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    const response = await fetch(`${apiUrl}/api/upload/profile-image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+      },
+      body: formData
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (data.success) {
-        // Update all relevant states
-        setSettingsData(prev => ({
-          ...prev,
+    if (data.success) {
+      // Update all relevant states
+      setSettingsData(prev => ({
+        ...prev,
+        profileImage: data.imageUrl
+      }));
+
+      setUserProfile((prev: any) => ({
+        ...prev,
+        profileImage: data.imageUrl
+      }));
+
+      if (updateUser) {
+        updateUser({
+          ...user!,
           profileImage: data.imageUrl
-        }));
-
-        setUserProfile((prev: any) => ({
-          ...prev,
-          profileImage: data.imageUrl
-        }));
-
-        if (updateUser) {
-          updateUser({
-            ...user!,
-            profileImage: data.imageUrl
-          });
-        }
-
-        setMessage({ type: 'success', text: 'Profilkép sikeresen feltöltve!' });
-        
-        // Clear message after 3 seconds
-        setTimeout(() => setMessage(null), 3000);
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Hiba történt a kép feltöltése során' });
+        });
       }
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      setMessage({ type: 'error', text: 'Hiba történt a kép feltöltése során' });
-    } finally {
-      setIsUploading(false);
+
+      setMessage({ type: 'success', text: 'Profilkép sikeresen feltöltve!' });
+      
+      // Clear message after 3 seconds
+      setTimeout(() => setMessage(null), 3000);
+    } else {
+      setMessage({ type: 'error', text: data.error || 'Hiba történt a kép feltöltése során' });
     }
-  };
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    setMessage({ type: 'error', text: 'Hiba történt a kép feltöltése során' });
+  } finally {
+    setIsUploading(false);
+  }
+};
 
-  const handleRemoveImage = async () => {
-    setIsUploading(true);
-    setMessage(null);
+const handleRemoveImage = async () => {
+  setIsUploading(true);
+  setMessage(null);
 
-    try {
-      const response = await fetch('/api/upload/profile-image', {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        // Update all relevant states
-        setSettingsData(prev => ({
-          ...prev,
-          profileImage: ''
-        }));
-
-        setUserProfile((prev: any) => ({
-          ...prev,
-          profileImage: ''
-        }));
-
-        if (updateUser) {
-          updateUser({
-            ...user!,
-            profileImage: ''
-          });
-        }
-
-        setMessage({ type: 'success', text: 'Profilkép sikeresen eltávolítva!' });
-        
-        // Clear message after 3 seconds
-        setTimeout(() => setMessage(null), 3000);
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Hiba történt a kép törlése során' });
+  try {
+    // ✅ JAVÍTOTT: API URL környezeti változóból
+    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    const response = await fetch(`${apiUrl}/api/upload/profile-image`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
       }
-    } catch (error) {
-      console.error('Error removing image:', error);
-      setMessage({ type: 'error', text: 'Hiba történt a kép törlése során' });
-    } finally {
-      setIsUploading(false);
-    }
-  };
+    });
 
+    const data = await response.json();
+
+    if (data.success) {
+      // Update all relevant states
+      setSettingsData(prev => ({
+        ...prev,
+        profileImage: ''
+      }));
+
+      setUserProfile((prev: any) => ({
+        ...prev,
+        profileImage: ''
+      }));
+
+      if (updateUser) {
+        updateUser({
+          ...user!,
+          profileImage: ''
+        });
+      }
+
+      setMessage({ type: 'success', text: 'Profilkép sikeresen eltávolítva!' });
+      
+      // Clear message after 3 seconds
+      setTimeout(() => setMessage(null), 3000);
+    } else {
+      setMessage({ type: 'error', text: data.error || 'Hiba történt a kép törlése során' });
+    }
+  } catch (error) {
+    console.error('Error removing image:', error);
+    setMessage({ type: 'error', text: 'Hiba történt a kép törlése során' });
+  } finally {
+    setIsUploading(false);
+  }
+};
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 navbar-padding">
