@@ -1,17 +1,17 @@
-// backend/server.js - ES MODULES ÁTÍRÁS
+// backend/server.js - JAVÍTOTT VERZIÓ
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from 'dotenv';
 import pool from './config/database.js';
+import modulesRoutes from './routes/modules.js';
 
-// ROUTE IMPORTS - ES MODULES
 // ROUTE IMPORTS - ES MODULES
 import authRoutes from './routes/auth.js';
 import profileRoutes from './routes/profiles.js';
 import uploadRoutes from './routes/upload.js';
-import serviceProvidersRoutes from './routes/serviceProviders.js';  // ✅ ADD HOZZÁ!
+import serviceProvidersRoutes from './routes/serviceProviders.js';
 
 // Próbáljuk meg betölteni az opcionális route-okat
 let messagesRoutes, projectRoutes, coursesRoutes;
@@ -60,6 +60,7 @@ app.use(cors(corsOptions));
 app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+// ❌ INNEN TÖRÖLD A MODULOK ROUTE-OT!
 
 // HEALTH CHECK ENDPOINTS ELŐSZÖR
 app.get('/', (req, res) => {
@@ -97,13 +98,14 @@ app.get('/api', (req, res) => {
       auth: '/api/auth',
       users: '/api/users', 
       profiles: '/api/users/profiles',
+      modules: '/api/users/profiles/modules',
       upload: '/api/upload',
-       'service-providers': '/api/service-providers'  // ✅ ADD HOZZÁ!
+      'service-providers': '/api/service-providers'
     }
   });
 });
 
-// ROUTE REGISZTRÁLÁS
+// ROUTE REGISZTRÁLÁS - ✅ ITT A JÓ HELY!
 console.log('🔗 Route regisztrálás...');
 
 app.use('/api/auth', authRoutes);
@@ -111,6 +113,10 @@ console.log('✅ Auth routes registered at /api/auth');
 
 app.use('/api/users/profiles', profileRoutes);
 console.log('✅ Profile routes registered at /api/users/profiles');
+
+// ✅ MODULOK ROUTE IDE KELL!
+app.use('/api/users/profiles/modules', modulesRoutes);
+console.log('✅ Modules routes registered at /api/users/profiles/modules');
 
 app.use('/api/upload', uploadRoutes);
 console.log('✅ Upload routes registered at /api/upload');
@@ -155,6 +161,8 @@ app.use('*', (req, res) => {
       'POST /api/auth/register',
       'POST /api/auth/login',
       'GET /api/users/profiles/me',
+      'GET /api/users/profiles/modules',
+      'POST /api/users/profiles/modules',
       'POST /api/upload/profile-image'
     ]
   });

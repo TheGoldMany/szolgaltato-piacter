@@ -28,9 +28,12 @@ const SettingsPage: React.FC = () => {
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
-        const response = await fetch('/api/auth/profile', {
+        // ✅ JAVÍTOTT: Token keresése mindkét storage-ból
+        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+        const apiUrl = 'http://localhost:5000';
+        const response = await fetch(`${apiUrl}/api/auth/profile`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            'Authorization': `Bearer ${token}`
           }
         });
 
@@ -71,11 +74,14 @@ const SettingsPage: React.FC = () => {
     setMessage(null);
 
     try {
-      const response = await fetch('/api/auth/update-profile', {
+      // ✅ JAVÍTOTT: Token keresése mindkét storage-ból
+      const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+      const apiUrl = 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/auth/update-profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           firstName: settingsData.firstName,
@@ -118,123 +124,126 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  // Validate file size (max 5MB)
-  if (file.size > 5 * 1024 * 1024) {
-    setMessage({ type: 'error', text: 'A kép mérete ne legyen nagyobb 5MB-nál' });
-    return;
-  }
-
-  // Validate file type
-  if (!file.type.startsWith('image/')) {
-    setMessage({ type: 'error', text: 'Csak képfájlok engedélyezettek' });
-    return;
-  }
-
-  setIsUploading(true);
-  setMessage(null);
-
-  try {
-    const formData = new FormData();
-    formData.append('image', file);
-
-    // ✅ JAVÍTOTT: API URL környezeti változóból
-    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-    const response = await fetch(`${apiUrl}/api/upload/profile-image`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      },
-      body: formData
-    });
-
-    const data = await response.json();
-
-    if (data.success) {
-      // Update all relevant states
-      setSettingsData(prev => ({
-        ...prev,
-        profileImage: data.imageUrl
-      }));
-
-      setUserProfile((prev: any) => ({
-        ...prev,
-        profileImage: data.imageUrl
-      }));
-
-      if (updateUser) {
-        updateUser({
-          ...user!,
-          profileImage: data.imageUrl
-        });
-      }
-
-      setMessage({ type: 'success', text: 'Profilkép sikeresen feltöltve!' });
-      
-      // Clear message after 3 seconds
-      setTimeout(() => setMessage(null), 3000);
-    } else {
-      setMessage({ type: 'error', text: data.error || 'Hiba történt a kép feltöltése során' });
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage({ type: 'error', text: 'A kép mérete ne legyen nagyobb 5MB-nál' });
+      return;
     }
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    setMessage({ type: 'error', text: 'Hiba történt a kép feltöltése során' });
-  } finally {
-    setIsUploading(false);
-  }
-};
 
-const handleRemoveImage = async () => {
-  setIsUploading(true);
-  setMessage(null);
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setMessage({ type: 'error', text: 'Csak képfájlok engedélyezettek' });
+      return;
+    }
 
-  try {
-    // ✅ JAVÍTOTT: API URL környezeti változóból
-    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-    const response = await fetch(`${apiUrl}/api/upload/profile-image`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+    setIsUploading(true);
+    setMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      // ✅ JAVÍTOTT: Token keresése mindkét storage-ból és API URL
+      const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+      const apiUrl = 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/upload/profile-image`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update all relevant states
+        setSettingsData(prev => ({
+          ...prev,
+          profileImage: data.data.url  // ✅ JAVÍTOTT: data.data.url az upload response-ból
+        }));
+
+        setUserProfile((prev: any) => ({
+          ...prev,
+          profileImage: data.data.url
+        }));
+
+        if (updateUser) {
+          updateUser({
+            ...user!,
+            profileImage: data.data.url
+          });
+        }
+
+        setMessage({ type: 'success', text: 'Profilkép sikeresen feltöltve!' });
+        
+        // Clear message after 3 seconds
+        setTimeout(() => setMessage(null), 3000);
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Hiba történt a kép feltöltése során' });
       }
-    });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      setMessage({ type: 'error', text: 'Hiba történt a kép feltöltése során' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
-    const data = await response.json();
+  const handleRemoveImage = async () => {
+    setIsUploading(true);
+    setMessage(null);
 
-    if (data.success) {
-      // Update all relevant states
-      setSettingsData(prev => ({
-        ...prev,
-        profileImage: ''
-      }));
+    try {
+      // ✅ JAVÍTOTT: Token keresése mindkét storage-ból
+      const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+      const apiUrl = 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/upload/profile-image`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
-      setUserProfile((prev: any) => ({
-        ...prev,
-        profileImage: ''
-      }));
+      const data = await response.json();
 
-      if (updateUser) {
-        updateUser({
-          ...user!,
+      if (data.success) {
+        // Update all relevant states
+        setSettingsData(prev => ({
+          ...prev,
           profileImage: ''
-        });
-      }
+        }));
 
-      setMessage({ type: 'success', text: 'Profilkép sikeresen eltávolítva!' });
-      
-      // Clear message after 3 seconds
-      setTimeout(() => setMessage(null), 3000);
-    } else {
-      setMessage({ type: 'error', text: data.error || 'Hiba történt a kép törlése során' });
+        setUserProfile((prev: any) => ({
+          ...prev,
+          profileImage: ''
+        }));
+
+        if (updateUser) {
+          updateUser({
+            ...user!,
+            profileImage: ''
+          });
+        }
+
+        setMessage({ type: 'success', text: 'Profilkép sikeresen eltávolítva!' });
+        
+        // Clear message after 3 seconds
+        setTimeout(() => setMessage(null), 3000);
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Hiba történt a kép törlése során' });
+      }
+    } catch (error) {
+      console.error('Error removing image:', error);
+      setMessage({ type: 'error', text: 'Hiba történt a kép törlése során' });
+    } finally {
+      setIsUploading(false);
     }
-  } catch (error) {
-    console.error('Error removing image:', error);
-    setMessage({ type: 'error', text: 'Hiba történt a kép törlése során' });
-  } finally {
-    setIsUploading(false);
-  }
-};
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 navbar-padding">
@@ -479,78 +488,79 @@ const handleRemoveImage = async () => {
           </div>
         </div>
       </div>
+
       {/* Footer */}
-<footer className="bg-gray-900 text-white py-12">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-      <div>
-  {/* ✅ CORVUS LOGO FOOTER-BEN - KÖZÉPEN, CSAK LOGO */}
-  <div className="flex justify-center mb-4">
-    <img 
-      src="./corvus-logo-crop.png"
-      alt="Corvus Logo" 
-      className="h-12 w-auto" // Nagyobb logo (48px)
-      onError={(e) => {
-        // Fallback - eredeti emoji
-        const target = e.target as HTMLImageElement;
-        target.style.display = 'none';
-        const fallback = target.nextElementSibling as HTMLElement;
-        if (fallback) {
-          fallback.style.display = 'inline';
-        }
-      }}
-    />
-    <span className="hidden text-2xl">🚀</span>
-  </div>
-  <p className="text-gray-400">
-    Találd meg a tökéletes szakembert minden igényedre.
-  </p>
-</div>
-      
-      <div>
-        <h4 className="font-semibold mb-4">Platform</h4>
-        <ul className="space-y-2 text-gray-400">
-          <li><a href="/services" className="hover:text-white transition-colors">Szolgáltatók böngészése</a></li>
-          <li><a href="/register" className="hover:text-white transition-colors">Regisztráció</a></li>
-          <li><a href="/education" className="hover:text-white transition-colors">Corvus Tanulás</a></li>
-          <li><a href="/projects" className="hover:text-white transition-colors">Projektek</a></li>
-        </ul>
-      </div>
-      
-      <div>
-        <h4 className="font-semibold mb-4">Támogatás</h4>
-        <ul className="space-y-2 text-gray-400">
-          <li><a href="/help" className="hover:text-white transition-colors">Súgó központ</a></li>
-          <li><a href="/contact" className="hover:text-white transition-colors">Kapcsolat</a></li>
-          <li><a href="/faq" className="hover:text-white transition-colors">GYIK</a></li>
-          <li><a href="/guidelines" className="hover:text-white transition-colors">Irányelvek</a></li>
-        </ul>
-      </div>
-      
-      <div>
-        <h4 className="font-semibold mb-4">Kapcsolat</h4>
-        <div className="space-y-2 text-gray-400">
-          <p>📧 info@corvus-platform.hu</p>
-          <p>📞 +36 1 234 5678</p>
-          <p>📍 Budapest, Magyarország</p>
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div>
+              {/* ✅ CORVUS LOGO FOOTER-BEN - KÖZÉPEN, CSAK LOGO */}
+              <div className="flex justify-center mb-4">
+                <img 
+                  src="./corvus-logo-crop.png"
+                  alt="Corvus Logo" 
+                  className="h-12 w-auto" // Nagyobb logo (48px)
+                  onError={(e) => {
+                    // Fallback - eredeti emoji
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const fallback = target.nextElementSibling as HTMLElement;
+                    if (fallback) {
+                      fallback.style.display = 'inline';
+                    }
+                  }}
+                />
+                <span className="hidden text-2xl">🚀</span>
+              </div>
+              <p className="text-gray-400">
+                Találd meg a tökéletes szakembert minden igényedre.
+              </p>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Platform</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="/services" className="hover:text-white transition-colors">Szolgáltatók böngészése</a></li>
+                <li><a href="/register" className="hover:text-white transition-colors">Regisztráció</a></li>
+                <li><a href="/education" className="hover:text-white transition-colors">Corvus Tanulás</a></li>
+                <li><a href="/projects" className="hover:text-white transition-colors">Projektek</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Támogatás</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="/help" className="hover:text-white transition-colors">Súgó központ</a></li>
+                <li><a href="/contact" className="hover:text-white transition-colors">Kapcsolat</a></li>
+                <li><a href="/faq" className="hover:text-white transition-colors">GYIK</a></li>
+                <li><a href="/guidelines" className="hover:text-white transition-colors">Irányelvek</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Kapcsolat</h4>
+              <div className="space-y-2 text-gray-400">
+                <p>📧 info@corvus-platform.hu</p>
+                <p>📞 +36 1 234 5678</p>
+                <p>📍 Budapest, Magyarország</p>
+              </div>
+            </div>
+          </div>
+          
+          <hr className="border-gray-700 my-8" />
+          
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <p className="text-gray-400">
+              © 2025 Corvus Platform Kft. Minden jog fenntartva.
+            </p>
+            <div className="flex space-x-6 mt-4 md:mt-0">
+              <a href="/privacy" className="text-gray-400 hover:text-white transition-colors">Adatvédelem</a>
+              <a href="/terms" className="text-gray-400 hover:text-white transition-colors">ÁSZF</a>
+              <a href="/cookies" className="text-gray-400 hover:text-white transition-colors">Sütik</a>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-    
-    <hr className="border-gray-700 my-8" />
-    
-    <div className="flex flex-col md:flex-row justify-between items-center">
-      <p className="text-gray-400">
-        © 2025 Corvus Platform Kft. Minden jog fenntartva.
-      </p>
-      <div className="flex space-x-6 mt-4 md:mt-0">
-        <a href="/privacy" className="text-gray-400 hover:text-white transition-colors">Adatvédelem</a>
-        <a href="/terms" className="text-gray-400 hover:text-white transition-colors">ÁSZF</a>
-        <a href="/cookies" className="text-gray-400 hover:text-white transition-colors">Sütik</a>
-      </div>
-    </div>
-  </div>
-</footer>
+      </footer>
     </div>
   );
 };

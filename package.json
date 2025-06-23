@@ -12,5 +12,8 @@
     "test": "npm run test:backend",
     "test:backend": "cd backend && npm test",
     "test:frontend": "cd frontend && npm test"
+  },
+  "dependencies": {
+    "lucide-react": "^0.522.0"
   }
 }

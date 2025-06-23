@@ -26,10 +26,14 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
+        // ✅ JAVÍTOTT: Token keresése mindkét storage-ból
+        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+        const apiUrl = 'http://localhost:5000';
+        
         // Load user profile data
-        const profileResponse = await fetch('/api/auth/profile', {
+        const profileResponse = await fetch(`${apiUrl}/api/auth/profile`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            'Authorization': `Bearer ${token}`
           }
         });
 
@@ -39,9 +43,9 @@ const Dashboard: React.FC = () => {
         }
 
         // Load dashboard statistics
-        const statsResponse = await fetch('/api/dashboard/stats', {
+        const statsResponse = await fetch(`${apiUrl}/api/dashboard/stats`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            'Authorization': `Bearer ${token}`
           }
         });
 
@@ -54,8 +58,8 @@ const Dashboard: React.FC = () => {
             totalProfiles: user?.userType === 'service_provider' ? 1 : 0,
             totalViews: user?.userType === 'service_provider' ? 125 : 0,
             totalMessages: 8,
-            totalBookings: user?.userType === 'customer' ? 3 : 0, // VISSZA: client -> customer
-            totalFavorites: user?.userType === 'customer' ? 12 : 0, // VISSZA: client -> customer
+            totalBookings: user?.userType === 'customer' ? 3 : 0,
+            totalFavorites: user?.userType === 'customer' ? 12 : 0,
             totalProjects: user?.userType === 'service_provider' ? 5 : 0,
           });
         }
@@ -66,8 +70,8 @@ const Dashboard: React.FC = () => {
           totalProfiles: user?.userType === 'service_provider' ? 1 : 0,
           totalViews: user?.userType === 'service_provider' ? 125 : 0,
           totalMessages: 8,
-          totalBookings: user?.userType === 'customer' ? 3 : 0, // VISSZA: client -> customer
-          totalFavorites: user?.userType === 'customer' ? 12 : 0, // VISSZA: client -> customer
+          totalBookings: user?.userType === 'customer' ? 3 : 0,
+          totalFavorites: user?.userType === 'customer' ? 12 : 0,
           totalProjects: user?.userType === 'service_provider' ? 5 : 0,
         });
       } finally {
@@ -103,10 +107,13 @@ const Dashboard: React.FC = () => {
       const formData = new FormData();
       formData.append('image', file);
 
-      const response = await fetch('/api/upload/profile-image', {
+      // ✅ JAVÍTOTT: Token keresése mindkét storage-ból és API URL
+      const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+      const apiUrl = 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/upload/profile-image`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          'Authorization': `Bearer ${token}`
         },
         body: formData
       });
@@ -114,17 +121,20 @@ const Dashboard: React.FC = () => {
       const data = await response.json();
 
       if (data.success) {
+        // ✅ JAVÍTOTT: data.data.url az upload response-ból
+        const imageUrl = data.data?.url || data.imageUrl;
+        
         // Update local user profile state
         setUserProfile((prev: any) => ({
           ...prev,
-          profileImage: data.imageUrl
+          profileImage: imageUrl
         }));
 
         // Update global user context
         if (updateUser) {
           updateUser({
             ...user!,
-            profileImage: data.imageUrl
+            profileImage: imageUrl
           });
         }
 
@@ -366,78 +376,79 @@ const Dashboard: React.FC = () => {
           <div className="text-4xl">💰</div>
         </div>
       </div>
+
       {/* Footer */}
-<footer className="bg-gray-900 text-white py-12">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-      <div>
-  {/* ✅ CORVUS LOGO FOOTER-BEN - KÖZÉPEN, CSAK LOGO */}
-  <div className="flex justify-center mb-4">
-    <img 
-      src="./corvus-logo-crop.png"
-      alt="Corvus Logo" 
-      className="h-12 w-auto" // Nagyobb logo (48px)
-      onError={(e) => {
-        // Fallback - eredeti emoji
-        const target = e.target as HTMLImageElement;
-        target.style.display = 'none';
-        const fallback = target.nextElementSibling as HTMLElement;
-        if (fallback) {
-          fallback.style.display = 'inline';
-        }
-      }}
-    />
-    <span className="hidden text-2xl">🚀</span>
-  </div>
-  <p className="text-gray-400">
-    Találd meg a tökéletes szakembert minden igényedre.
-  </p>
-</div>
-      
-      <div>
-        <h4 className="font-semibold mb-4">Platform</h4>
-        <ul className="space-y-2 text-gray-400">
-          <li><a href="/services" className="hover:text-white transition-colors">Szolgáltatók böngészése</a></li>
-          <li><a href="/register" className="hover:text-white transition-colors">Regisztráció</a></li>
-          <li><a href="/education" className="hover:text-white transition-colors">Corvus Tanulás</a></li>
-          <li><a href="/projects" className="hover:text-white transition-colors">Projektek</a></li>
-        </ul>
-      </div>
-      
-      <div>
-        <h4 className="font-semibold mb-4">Támogatás</h4>
-        <ul className="space-y-2 text-gray-400">
-          <li><a href="/help" className="hover:text-white transition-colors">Súgó központ</a></li>
-          <li><a href="/contact" className="hover:text-white transition-colors">Kapcsolat</a></li>
-          <li><a href="/faq" className="hover:text-white transition-colors">GYIK</a></li>
-          <li><a href="/guidelines" className="hover:text-white transition-colors">Irányelvek</a></li>
-        </ul>
-      </div>
-      
-      <div>
-        <h4 className="font-semibold mb-4">Kapcsolat</h4>
-        <div className="space-y-2 text-gray-400">
-          <p>📧 info@corvus-platform.hu</p>
-          <p>📞 +36 1 234 5678</p>
-          <p>📍 Budapest, Magyarország</p>
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div>
+              {/* ✅ CORVUS LOGO FOOTER-BEN - KÖZÉPEN, CSAK LOGO */}
+              <div className="flex justify-center mb-4">
+                <img 
+                  src="./corvus-logo-crop.png"
+                  alt="Corvus Logo" 
+                  className="h-12 w-auto" // Nagyobb logo (48px)
+                  onError={(e) => {
+                    // Fallback - eredeti emoji
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const fallback = target.nextElementSibling as HTMLElement;
+                    if (fallback) {
+                      fallback.style.display = 'inline';
+                    }
+                  }}
+                />
+                <span className="hidden text-2xl">🚀</span>
+              </div>
+              <p className="text-gray-400">
+                Találd meg a tökéletes szakembert minden igényedre.
+              </p>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Platform</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="/services" className="hover:text-white transition-colors">Szolgáltatók böngészése</a></li>
+                <li><a href="/register" className="hover:text-white transition-colors">Regisztráció</a></li>
+                <li><a href="/education" className="hover:text-white transition-colors">Corvus Tanulás</a></li>
+                <li><a href="/projects" className="hover:text-white transition-colors">Projektek</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Támogatás</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="/help" className="hover:text-white transition-colors">Súgó központ</a></li>
+                <li><a href="/contact" className="hover:text-white transition-colors">Kapcsolat</a></li>
+                <li><a href="/faq" className="hover:text-white transition-colors">GYIK</a></li>
+                <li><a href="/guidelines" className="hover:text-white transition-colors">Irányelvek</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Kapcsolat</h4>
+              <div className="space-y-2 text-gray-400">
+                <p>📧 info@corvus-platform.hu</p>
+                <p>📞 +36 1 234 5678</p>
+                <p>📍 Budapest, Magyarország</p>
+              </div>
+            </div>
+          </div>
+          
+          <hr className="border-gray-700 my-8" />
+          
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <p className="text-gray-400">
+              © 2025 Corvus Platform Kft. Minden jog fenntartva.
+            </p>
+            <div className="flex space-x-6 mt-4 md:mt-0">
+              <a href="/privacy" className="text-gray-400 hover:text-white transition-colors">Adatvédelem</a>
+              <a href="/terms" className="text-gray-400 hover:text-white transition-colors">ÁSZF</a>
+              <a href="/cookies" className="text-gray-400 hover:text-white transition-colors">Sütik</a>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-    
-    <hr className="border-gray-700 my-8" />
-    
-    <div className="flex flex-col md:flex-row justify-between items-center">
-      <p className="text-gray-400">
-        © 2025 Corvus Platform Kft. Minden jog fenntartva.
-      </p>
-      <div className="flex space-x-6 mt-4 md:mt-0">
-        <a href="/privacy" className="text-gray-400 hover:text-white transition-colors">Adatvédelem</a>
-        <a href="/terms" className="text-gray-400 hover:text-white transition-colors">ÁSZF</a>
-        <a href="/cookies" className="text-gray-400 hover:text-white transition-colors">Sütik</a>
-      </div>
-    </div>
-  </div>
-</footer>
+      </footer>
     </div>
   );
 
@@ -461,7 +472,7 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* Üdvözlő szekció profilkép feltöltéssel */}
-      <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-2xl p-8 text-white">
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white">
         <div className="flex items-center justify-between">
           <div className="flex-1">
             <h1 className="text-3xl font-bold mb-2">
@@ -511,8 +522,8 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Statisztika kártyák */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Statisztika kártyák - EGYSÉGES CSS STRUKTÚRA */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -531,8 +542,20 @@ const Dashboard: React.FC = () => {
               <p className="text-gray-600 text-sm font-medium">Kedvenc szolgáltatók</p>
               <p className="text-3xl font-bold text-gray-900">{stats.totalFavorites}</p>
             </div>
-            <div className="bg-red-100 p-3 rounded-full">
+            <div className="bg-green-100 p-3 rounded-full">
               <span className="text-2xl">❤️</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm font-medium">Aktív projektek</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.totalProjects || 0}</p>
+            </div>
+            <div className="bg-purple-100 p-3 rounded-full">
+              <span className="text-2xl">🏗️</span>
             </div>
           </div>
         </div>
@@ -550,7 +573,7 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Gyors műveletek */}
+      {/* Gyors műveletek - EGYSÉGES CSS STRUKTÚRA */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-6">🚀 Gyors műveletek</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -594,10 +617,36 @@ const Dashboard: React.FC = () => {
           </button>
 
           <button
-            onClick={() => navigate('/messages')}
-            className="flex items-center p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-all duration-200 group"
+            onClick={() => navigate('/workspace')}
+            className="flex items-center p-4 bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-lg hover:from-purple-100 hover:to-purple-200 transition-all duration-200 group"
           >
-            <div className="bg-yellow-600 p-2 rounded-lg mr-4 group-hover:scale-110 transition-transform">
+            <div className="bg-purple-600 p-2 rounded-lg mr-4 group-hover:scale-110 transition-transform">
+              <span className="text-white text-lg">🏗️</span>
+            </div>
+            <div className="text-left">
+              <h3 className="font-semibold text-gray-900">Projektek</h3>
+              <p className="text-sm text-gray-600">Projektmenedzsment</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/orders')}
+            className="flex items-center p-4 bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 rounded-lg hover:from-orange-100 hover:to-orange-200 transition-all duration-200 group"
+          >
+            <div className="bg-orange-600 p-2 rounded-lg mr-4 group-hover:scale-110 transition-transform">
+              <span className="text-white text-lg">📦</span>
+            </div>
+            <div className="text-left">
+              <h3 className="font-semibold text-gray-900">Megrendelések</h3>
+              <p className="text-sm text-gray-600">Rendelések kezelése</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/messages')}
+            className="flex items-center p-4 bg-gradient-to-r from-pink-50 to-pink-100 border border-pink-200 rounded-lg hover:from-pink-100 hover:to-pink-200 transition-all duration-200 group"
+          >
+            <div className="bg-pink-600 p-2 rounded-lg mr-4 group-hover:scale-110 transition-transform">
               <span className="text-white text-lg">💬</span>
             </div>
             <div className="text-left">
@@ -605,23 +654,10 @@ const Dashboard: React.FC = () => {
               <p className="text-sm text-gray-600">Kommunikáció</p>
             </div>
           </button>
-
-          <button
-            onClick={() => navigate('/ai-chat')}
-            className="flex items-center p-4 bg-gradient-to-r from-indigo-50 to-indigo-100 border border-indigo-200 rounded-lg hover:from-indigo-100 hover:to-indigo-200 transition-all duration-200 group"
-          >
-            <div className="bg-indigo-600 p-2 rounded-lg mr-4 group-hover:scale-110 transition-transform">
-              <span className="text-white text-lg">🤖</span>
-            </div>
-            <div className="text-left">
-              <h3 className="font-semibold text-gray-900">AI Asszisztens</h3>
-              <p className="text-sm text-gray-600">Segítség keresése</p>
-            </div>
-          </button>
         </div>
       </div>
 
-      {/* Szolgáltatóvá válás promó */}
+      {/* Promó szekció - EGYSÉGES CSS STRUKTÚRA */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-100 border border-blue-200 rounded-xl p-6">
         <div className="flex items-center justify-between">
           <div>
@@ -639,81 +675,80 @@ const Dashboard: React.FC = () => {
           <div className="text-4xl">🚀</div>
         </div>
       </div>
-      {/* Footer */}
-<footer className="bg-gray-900 text-white py-12">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-      <div>
-  {/* ✅ CORVUS LOGO FOOTER-BEN - KÖZÉPEN, CSAK LOGO */}
-  <div className="flex justify-center mb-4">
-    <img 
-      src="./corvus-logo-crop.png"
-      alt="Corvus Logo" 
-      className="h-12 w-auto" // Nagyobb logo (48px)
-      onError={(e) => {
-        // Fallback - eredeti emoji
-        const target = e.target as HTMLImageElement;
-        target.style.display = 'none';
-        const fallback = target.nextElementSibling as HTMLElement;
-        if (fallback) {
-          fallback.style.display = 'inline';
-        }
-      }}
-    />
-    <span className="hidden text-2xl">🚀</span>
-  </div>
-  <p className="text-gray-400">
-    Találd meg a tökéletes szakembert minden igényedre.
-  </p>
-</div>
-      
-      <div>
-        <h4 className="font-semibold mb-4">Platform</h4>
-        <ul className="space-y-2 text-gray-400">
-          <li><a href="/services" className="hover:text-white transition-colors">Szolgáltatók böngészése</a></li>
-          <li><a href="/register" className="hover:text-white transition-colors">Regisztráció</a></li>
-          <li><a href="/education" className="hover:text-white transition-colors">Corvus Tanulás</a></li>
-          <li><a href="/projects" className="hover:text-white transition-colors">Projektek</a></li>
-        </ul>
-      </div>
-      
-      <div>
-        <h4 className="font-semibold mb-4">Támogatás</h4>
-        <ul className="space-y-2 text-gray-400">
-          <li><a href="/help" className="hover:text-white transition-colors">Súgó központ</a></li>
-          <li><a href="/contact" className="hover:text-white transition-colors">Kapcsolat</a></li>
-          <li><a href="/faq" className="hover:text-white transition-colors">GYIK</a></li>
-          <li><a href="/guidelines" className="hover:text-white transition-colors">Irányelvek</a></li>
-        </ul>
-      </div>
-      
-      <div>
-        <h4 className="font-semibold mb-4">Kapcsolat</h4>
-        <div className="space-y-2 text-gray-400">
-          <p>📧 info@corvus-platform.hu</p>
-          <p>📞 +36 1 234 5678</p>
-          <p>📍 Budapest, Magyarország</p>
-        </div>
-      </div>
-    </div>
-    
-    <hr className="border-gray-700 my-8" />
-    
-    <div className="flex flex-col md:flex-row justify-between items-center">
-      <p className="text-gray-400">
-        © 2025 Corvus Platform Kft. Minden jog fenntartva.
-      </p>
-      <div className="flex space-x-6 mt-4 md:mt-0">
-        <a href="/privacy" className="text-gray-400 hover:text-white transition-colors">Adatvédelem</a>
-        <a href="/terms" className="text-gray-400 hover:text-white transition-colors">ÁSZF</a>
-        <a href="/cookies" className="text-gray-400 hover:text-white transition-colors">Sütik</a>
-      </div>
-    </div>
-  </div>
-</footer>
 
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div>
+              {/* ✅ CORVUS LOGO FOOTER-BEN - KÖZÉPEN, CSAK LOGO */}
+              <div className="flex justify-center mb-4">
+                <img 
+                  src="./corvus-logo-crop.png"
+                  alt="Corvus Logo" 
+                  className="h-12 w-auto" // Nagyobb logo (48px)
+                  onError={(e) => {
+                    // Fallback - eredeti emoji
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const fallback = target.nextElementSibling as HTMLElement;
+                    if (fallback) {
+                      fallback.style.display = 'inline';
+                    }
+                  }}
+                />
+                <span className="hidden text-2xl">🚀</span>
+              </div>
+              <p className="text-gray-400">
+                Találd meg a tökéletes szakembert minden igényedre.
+              </p>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Platform</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="/services" className="hover:text-white transition-colors">Szolgáltatók böngészése</a></li>
+                <li><a href="/register" className="hover:text-white transition-colors">Regisztráció</a></li>
+                <li><a href="/education" className="hover:text-white transition-colors">Corvus Tanulás</a></li>
+                <li><a href="/projects" className="hover:text-white transition-colors">Projektek</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Támogatás</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="/help" className="hover:text-white transition-colors">Súgó központ</a></li>
+                <li><a href="/contact" className="hover:text-white transition-colors">Kapcsolat</a></li>
+                <li><a href="/faq" className="hover:text-white transition-colors">GYIK</a></li>
+                <li><a href="/guidelines" className="hover:text-white transition-colors">Irányelvek</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Kapcsolat</h4>
+              <div className="space-y-2 text-gray-400">
+                <p>📧 info@corvus-platform.hu</p>
+                <p>📞 +36 1 234 5678</p>
+                <p>📍 Budapest, Magyarország</p>
+              </div>
+            </div>
+          </div>
+          
+          <hr className="border-gray-700 my-8" />
+          
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <p className="text-gray-400">
+              © 2025 Corvus Platform Kft. Minden jog fenntartva.
+            </p>
+            <div className="flex space-x-6 mt-4 md:mt-0">
+              <a href="/privacy" className="text-gray-400 hover:text-white transition-colors">Adatvédelem</a>
+              <a href="/terms" className="text-gray-400 hover:text-white transition-colors">ÁSZF</a>
+              <a href="/cookies" className="text-gray-400 hover:text-white transition-colors">Sütik</a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
-    
   );
 
   if (isLoading) {

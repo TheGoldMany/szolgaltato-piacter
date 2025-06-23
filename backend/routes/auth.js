@@ -226,14 +226,14 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// PROFILE endpoint - Dashboard adatok
+// ✅ FRISSÍTVE: PROFILE endpoint - profilkép betöltéssel
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     
     const userQuery = await pool.query(
       `SELECT id, email, first_name, last_name, user_type, phone, 
-              is_verified, created_at 
+              is_verified, profile_image_url, created_at 
        FROM users WHERE id = $1`,
       [userId]
     );
@@ -277,6 +277,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
         userType: user.user_type,
         phone: user.phone,
         isVerified: user.is_verified,
+        profileImage: user.profile_image_url, // ✅ HOZZÁADVA: profilkép URL
         createdAt: user.created_at
       },
       serviceStats

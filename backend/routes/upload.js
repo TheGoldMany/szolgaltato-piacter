@@ -4,6 +4,7 @@ import express from 'express';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import auth from '../middleware/auth.js';
+import pool from '../config/database.js'; // ✅ HOZZÁADVA: adatbázis kapcsolat
 
 const router = express.Router();
 
@@ -61,7 +62,7 @@ router.get('/info', auth, (req, res) => {
   });
 });
 
-// Profilkép feltöltés
+// Profilkép feltöltés ✅ FRISSÍTVE: adatbázis mentéssel
 router.post('/profile-image', auth, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -95,6 +96,17 @@ router.post('/profile-image', auth, upload.single('image'), async (req, res) => 
     });
 
     console.log('✅ Cloudinary upload sikeres:', uploadResult.secure_url);
+
+    // ✅ ÚJ: Kép URL mentése az adatbázisba
+    try {
+      await pool.query(
+        'UPDATE users SET profile_image_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [uploadResult.secure_url, req.user.userId]
+      );
+      console.log('✅ Profilkép URL elmentve adatbázisba');
+    } catch (dbError) {
+      console.error('❌ Adatbázis mentési hiba:', dbError);
+    }
 
     res.json({
       success: true,
@@ -184,7 +196,66 @@ router.post('/cover-image', auth, upload.single('image'), async (req, res) => {
   }
 });
 
-// Kép törlés
+// ✅ FRISSÍTVE: Profilkép törlés adatbázisból is
+router.delete('/profile-image', auth, async (req, res) => {
+  try {
+    console.log(`🗑️ Profilkép törlése user ${req.user.userId} számára`);
+
+    // Jelenlegi profilkép lekérése az adatbázisból
+    const userResult = await pool.query(
+      'SELECT profile_image_url FROM users WHERE id = $1',
+      [req.user.userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Felhasználó nem található'
+      });
+    }
+
+    const currentImageUrl = userResult.rows[0].profile_image_url;
+
+    if (!currentImageUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nincs profilkép törölni'
+      });
+    }
+
+    // Public ID kivonása a Cloudinary URL-ből
+    const urlParts = currentImageUrl.split('/');
+    const publicIdWithExtension = urlParts[urlParts.length - 1];
+    const publicId = `profile-images/${publicIdWithExtension.split('.')[0]}`;
+
+    // Cloudinary-ból törlés
+    const deleteResult = await cloudinary.uploader.destroy(publicId);
+    console.log('Cloudinary törlés eredménye:', deleteResult);
+
+    // Adatbázisból URL törlése
+    await pool.query(
+      'UPDATE users SET profile_image_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [req.user.userId]
+    );
+
+    console.log('✅ Profilkép sikeresen törölve mindenhonnan');
+
+    res.json({
+      success: true,
+      message: 'Profilkép sikeresen eltávolítva! 🗑️'
+    });
+
+  } catch (error) {
+    console.error('Profile image deletion error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Hiba történt a kép törlése során',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'Deletion failed'
+    });
+  }
+});
+
+// Kép törlés (általános)
 router.delete('/image/:publicId', auth, async (req, res) => {
   try {
     const { publicId } = req.params;
